@@ -7,7 +7,7 @@ ARG PROTOBUF_VERS="3.14.0"
 FROM openjdk:15-buster
 
 ARG MACHINE
-ARG BAZ_OPTS
+ARG BAZEL_OPTS
 ARG BAZEL_VERS
 
 RUN apt-get update && apt-get -y install \
