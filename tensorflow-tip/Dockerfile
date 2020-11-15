@@ -45,7 +45,7 @@ RUN curl -fLSs -o /tmp/protoc.zip \
     && rm /tmp/protoc.zip
 
 COPY --from=0 /build/tensorflow/bazel-bin/tensorflow/tools/lib_package/libtensorflow.tar.gz /tmp/libtensorflow.tar.gz
-RUN tar xz -C /usr/local -f /tmp/libtensorflow.tar.gz
+RUN tar xz -C /usr/local -f /tmp/libtensorflow.tar.gz && rm /tmp/libtensorflow.tar.gz
 
 RUN ldconfig
 
