@@ -4,10 +4,7 @@ ARG TENSORFLOW_VERS="1.15.0"
 FROM golang:1.15-buster
 
 ARG MACHINE
-ARG PROTOBUF_VERS
 ARG TENSORFLOW_VERS
-
-RUN apt-get update && apt-get install -y unzip
 
 RUN curl -fLSs https://storage.googleapis.com/tensorflow/libtensorflow/libtensorflow-cpu-linux-${MACHINE}-${TENSORFLOW_VERS}.tar.gz \
     | tar xz -C /usr/local
