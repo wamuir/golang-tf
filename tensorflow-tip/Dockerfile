@@ -54,3 +54,5 @@ RUN go get -d github.com/tensorflow/tensorflow || true
 RUN go generate github.com/tensorflow/tensorflow/tensorflow/go/op
 
 RUN go test github.com/tensorflow/tensorflow/tensorflow/go
+
+WORKDIR ${GOPATH}
