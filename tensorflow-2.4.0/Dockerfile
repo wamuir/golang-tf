@@ -31,6 +31,24 @@ RUN mv ${GOPATH}/src/github.com/tensorflow/tensorflow-${TENSORFLOW_VERS} ${GOPAT
 RUN go generate github.com/tensorflow/tensorflow/tensorflow/go/op
 RUN go test github.com/tensorflow/tensorflow/tensorflow/go
 
+# make tensorflow work with go mod
+RUN cd ${GOPATH}/src/github.com/tensorflow/tensorflow \
+    && go mod init github.com/tensorflow/tensorflow
+RUN cd ${GOPATH}/src/github.com/tensorflow/tensorflow/tensorflow/go \
+    && ln -s vendor/github.com/tensorflow/tensorflow/tensorflow/go/core core \
+    && ln -s vendor/github.com/tensorflow/tensorflow/tensorflow/go/stream_executor stream_executor
+
 # hello from tensorflow
+WORKDIR /opt/build
 COPY tf.go .
 RUN go run tf.go
+
+# hello from tensorflow (with go get)
+WORKDIR /opt/build
+COPY tf.go .
+RUN go mod init tf-says-hello
+RUN go mod edit -require github.com/tensorflow/tensorflow@v${TENSORFLOW_VERS}+incompatible
+RUN go mod edit -replace github.com/tensorflow/tensorflow=${GOPATH}/src/github.com/tensorflow/tensorflow
+RUN go get && go run tf.go
+
+WORKDIR $GOPATH
