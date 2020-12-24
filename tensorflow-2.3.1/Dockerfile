@@ -1,34 +1,56 @@
-ARG MACHINE="x86_64"
 ARG PROTOBUF_VERS="3.14.0"
 ARG TENSORFLOW_VERS="2.3.1"
 
 FROM golang:1.15-buster
 
-ARG MACHINE
 ARG PROTOBUF_VERS
 ARG TENSORFLOW_VERS
 
-RUN apt-get update && apt-get install -y unzip
+# fetch and install protoc
+RUN curl -fLSs -o /opt/protoc.zip \
+    https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOBUF_VERS}/protoc-${PROTOBUF_VERS}-linux-`uname -m`.zip \
+    && python -m zipfile -e /opt/protoc.zip /usr/local \
+    && chmod +x /usr/local/bin/protoc
 
-RUN curl -fLSs -o /tmp/protoc.zip \
-    https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOBUF_VERS}/protoc-${PROTOBUF_VERS}-linux-${MACHINE}.zip \
-    && unzip -q -o /tmp/protoc.zip -d /usr/local bin/protoc \ 
-    && unzip -q -o /tmp/protoc.zip -d /usr/local 'include/*' \
-    && rm /tmp/protoc.zip
+# fetch and install tensorflow c libs
+RUN curl -fLSs -o /opt/libtensorflow.tar.gz \
+    https://storage.googleapis.com/tensorflow/libtensorflow/libtensorflow-cpu-linux-`uname -m`-${TENSORFLOW_VERS}.tar.gz \
+    && tar xz -C /usr/local -f /opt/libtensorflow.tar.gz
 
-RUN curl -fLSs https://storage.googleapis.com/tensorflow/libtensorflow/libtensorflow-cpu-linux-${MACHINE}-${TENSORFLOW_VERS}.tar.gz \
-    | tar xz -C /usr/local
-
+# link shared libs
 RUN ldconfig
 
-RUN mkdir -p ${GOPATH}/src/github.com/tensorflow/tensorflow
-RUN curl -fLSs https://github.com/tensorflow/tensorflow/archive/v${TENSORFLOW_VERS}.tar.gz \
-    | tar xz --strip-components=1 --directory=${GOPATH}/src/github.com/tensorflow/tensorflow
+# fetch tensorflow source
+RUN mkdir -p ${GOPATH}/src/github.com/tensorflow
+RUN curl -fLSs -o /opt/tensorflow.tar.gz \
+    https://github.com/tensorflow/tensorflow/archive/v${TENSORFLOW_VERS}.tar.gz \
+    && tar -xz -C ${GOPATH}/src/github.com/tensorflow -f /opt/tensorflow.tar.gz
+RUN mv ${GOPATH}/src/github.com/tensorflow/tensorflow-${TENSORFLOW_VERS} ${GOPATH}/src/github.com/tensorflow/tensorflow
 
+# generate and test
 RUN go generate github.com/tensorflow/tensorflow/tensorflow/go/op
 WORKDIR ${GOPATH}/src/github.com/tensorflow/tensorflow/tensorflow/go/vendor/github.com/tensorflow/tensorflow/tensorflow/go/core/protobuf
 RUN ln -s ../core_protos_go_proto for_core_protos_go_proto
-
 RUN go test github.com/tensorflow/tensorflow/tensorflow/go
 
-WORKDIR ${GOPATH}
+# make tensorflow work with go mod
+RUN cd ${GOPATH}/src/github.com/tensorflow/tensorflow \
+    && go mod init github.com/tensorflow/tensorflow
+RUN cd ${GOPATH}/src/github.com/tensorflow/tensorflow/tensorflow/go \
+    && ln -s vendor/github.com/tensorflow/tensorflow/tensorflow/go/core core \
+    && ln -s vendor/github.com/tensorflow/tensorflow/tensorflow/go/stream_executor stream_executor
+
+# hello from tensorflow
+WORKDIR /opt/build
+COPY tf.go .
+RUN go run tf.go
+
+# hello from tensorflow (with go get)
+WORKDIR /opt/build
+COPY tf.go .
+RUN go mod init tf-says-hello
+RUN go mod edit -require github.com/tensorflow/tensorflow@v${TENSORFLOW_VERS}+incompatible
+RUN go mod edit -replace github.com/tensorflow/tensorflow=${GOPATH}/src/github.com/tensorflow/tensorflow
+RUN go get && go run tf.go
+
+WORKDIR $GOPATH
