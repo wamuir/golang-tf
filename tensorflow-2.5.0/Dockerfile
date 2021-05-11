@@ -2,6 +2,26 @@ ARG BAZEL OPS="--config=release_cpu_linux"
 ARG USE_BAZEL_VERS="3.7.2"
 ARG PROTOBUF_VERS="3.15.8"
 ARG TENSORFLOW_VERS="2.5.0-rc3"
+ARG TF_SEMVAR=${TENSORFLOW_VERS:+v${TENSORFLOW_VERS}}
+ARG TF_GO_SEMVAR${TFV:+github.com/tensorflow/tensorflow@v${TFV}+incompatible}
+
+
+
+# BASE GO IMAGE
+FROM golang:1.16-buster AS base
+
+# fetch tensorflow source
+WORKDIR ${GOPATH}/src/github.com/tensorflow/tensorflow
+ARG TF_SEMVAR
+RUN git clone --branch=${TF_SEMVAR:-master} --depth=1 https://github.com/tensorflow/tensorflow.git .
+
+# apply patch to add missing go package declarations to proto definitions (#48854)
+COPY 0001-add-go_package-to-proto-definition-files.patch .
+RUN git apply 0001-add-go_package-to-proto-definition-files.patch
+
+# apply patch to write generated source code to tensorflow source / don't vendor (#48872)
+COPY 0001-simplify-generation-of-go-protos.patch .
+RUN git apply 0001-simplify-generation-of-go-protos.patch
 
 
 
@@ -21,11 +41,10 @@ RUN git clone --recurse-submodules https://github.com/protocolbuffers/protobuf.g
     && ./autogen.sh \
     && ./configure \
     && cd src \
-    && make -j8 protoc \
+    && make -j$(nproc) protoc \
     && make install \
     && make install DESTDIR=/protobuf/build \
-    && tar -czf /protobuf.tar.gz -C /protobuf/build/usr/local . \
-    && rm -rf /protobuf
+    && tar -czf /protobuf.tar.gz -C /protobuf/build/usr/local .
 
 
 
@@ -34,7 +53,7 @@ FROM debian:buster-slim AS bazel-build
 
 WORKDIR /bazel
 ARG USE_BAZEL_VERS
-RUN mkdir -p /usr/share/man/man1
+RUN mkdir -p /usr/share/man/man1 # bug for openjdk on slim variants / man directories missing
 RUN apt-get update && apt-get -y install --no-install-recommends \
     build-essential \
     curl \
@@ -52,30 +71,56 @@ RUN python3 -m venv /venv \
     && echo '@@ -89 +89,2 @@\n-  return "/proc/self/exe";\n+  static char path[PATH_MAX];\n+  return realpath("/proc/self/exe", path);' \
        | patch src/main/cpp/blaze_util_linux.cc \
     && env EXTRA_BAZEL_ARGS="--host_javabase=@local_jdk//:jdk" bash ./compile.sh \
-    && mv /bazel/output/bazel /usr/local/bin/bazel \
-    && rm -rf /bazel
+    && mv /bazel/output/bazel /usr/local/bin/bazel
 
-# uncomment to use bazelisk instead of building bazel (amd64 only)
-# ARG USE_BAZEL_VERS
-# RUN go get github.com/bazelbuild/bazelisk \
-#    && ln -s ${GOPATH}/bin/bazelisk /usr/bin/bazel
+
+
+# BUILD DEVTOOLSET
+FROM debian:buster-slim AS devtoolset-build
+
+COPY --from=base /go/src/github.com/tensorflow/tensorflow/tensorflow/tools/ci_build/devtoolset/build_devtoolset.sh /
+COPY --from=base /go/src/github.com/tensorflow/tensorflow/tensorflow/tools/ci_build/devtoolset/fixlinks.sh /
+COPY --from=base /go/src/github.com/tensorflow/tensorflow/tensorflow/tools/ci_build/devtoolset/platlib.patch /
+COPY --from=base /go/src/github.com/tensorflow/tensorflow/tensorflow/tools/ci_build/devtoolset/rpm-patch.sh /
+
+WORKDIR /
+RUN apt-get update && apt-get -y install --no-install-recommends \
+    build-essential \
+    cpio \
+    file \
+    flex \
+    rpm2cpio \
+    unar \
+    wget
+RUN /build_devtoolset.sh devtoolset-7 /dt7 \
+    && /build_devtoolset.sh devtoolset-8 /dt8
 
 
 
 # BUILD TENSORFLOW
 FROM debian:buster-slim AS tensorflow-build
 
+# copy tensorflow source
+COPY --from=base /go/src/github.com/tensorflow/tensorflow /tensorflow
+
+# install protoc binary and libs
 COPY --from=protobuf-build /protobuf.tar.gz /opt/protobuf.tar.gz
 RUN tar xz -C /usr/local -f /opt/protobuf.tar.gz && rm /opt/protobuf.tar.gz
+
+# install bazel binary
 COPY --from=bazel-build /usr/local/bin/bazel /usr/local/bin/bazel
+
+# copy devtoolset
+COPY --from=devtoolset-build /dt7 /dt7
+COPY --from=devtoolset-build /dt8 /dt8
+
+# link shared libraries
 RUN ldconfig
 
+# build tensorflow
 WORKDIR /tensorflow
 ARG BAZEL_OPTS
-ARG CC_OPT_FLAGS
-ARG TENSORFLOW_VERS
-ARG TFV=${TENSORFLOW_VERS:+v${TENSORFLOW_VERS}}
-RUN mkdir -p /usr/share/man/man1
+RUN mkdir -p /usr/share/man/man1 # bug for openjdk on slim variants / man directories missing
 RUN apt-get update && apt-get -y install --no-install-recommends \
     build-essential \
     git \
@@ -87,17 +132,15 @@ RUN apt-get update && apt-get -y install --no-install-recommends \
 RUN python3 -m venv /venv \
     && . /venv/bin/activate \
     && python3 -m pip install numpy \
-    && git clone --branch=${TFV:-master} --depth=1 https://github.com/tensorflow/tensorflow.git . \
     && ./configure \
     && bazel test ${BAZEL_OPTS} //tensorflow/tools/lib_package:libtensorflow_test \
     && bazel build ${BAZEL_OPTS} //tensorflow/tools/lib_package:libtensorflow.tar.gz \
-    && mv bazel-bin/tensorflow/tools/lib_package/libtensorflow.tar.gz /libtensorflow.tar.gz \
-    && rm -rf /tensorflow
+    && mv bazel-bin/tensorflow/tools/lib_package/libtensorflow.tar.gz /libtensorflow.tar.gz
 
 
 
 # GET AND INSTALL TENSORFLOW/GO PACKAGE 
-FROM golang:1.16-buster AS golang-tf
+FROM base AS golang-tf
 
 # install protoc binary and libs
 COPY --from=protobuf-build /protobuf.tar.gz /opt/protobuf.tar.gz
@@ -110,19 +153,11 @@ RUN tar xz -C /usr/local -f /opt/libtensorflow.tar.gz && rm /opt/libtensorflow.t
 # link shared libs
 RUN ldconfig
 
-# fetch tensorflow source and apply patches
-WORKDIR ${GOPATH}/src/github.com/tensorflow/tensorflow
-ARG TENSORFLOW_VERS
-ARG TFV=${TENSORFLOW_VERS:+v${TENSORFLOW_VERS}}
-RUN git clone --branch=${TFV:-master} --depth=1 https://github.com/tensorflow/tensorflow.git .
-COPY 0001-add-go_package-to-proto-definition-files.patch .
-RUN git apply 0001-add-go_package-to-proto-definition-files.patch
-COPY 0001-simplify-generation-of-go-protos.patch .
-RUN git apply 0001-simplify-generation-of-go-protos.patch
 
 # generate protocol buffers 
+ARG TF_GO_SEMVAR
 RUN cd ${GOPATH}/src/github.com/tensorflow/tensorflow \
-    && go mod init \
+    && go mod init ${TF_GO_SEMVAR} \
     && go generate github.com/tensorflow/tensorflow/tensorflow/go/op \
     && go mod tidy
 
@@ -137,9 +172,10 @@ FROM golang-tf as demo
 
 # hello from tensorflow (with go get)
 WORKDIR /opt/build
+ARG TF_GO_SEMVAR
 COPY tf.go .
 RUN go mod init tf-says-hello
-RUN go mod edit -require github.com/tensorflow/tensorflow@v${TENSORFLOW_VERS:-$(date +"%Y.%-m.%-d")}+incompatible
+RUN go mod edit -require github.com/tensorflow/tensorflow@${TF_GO_SEMVAR:-latest}
 RUN go mod edit -replace github.com/tensorflow/tensorflow=${GOPATH}/src/github.com/tensorflow/tensorflow
 RUN go mod tidy
 RUN go get && go run tf.go
