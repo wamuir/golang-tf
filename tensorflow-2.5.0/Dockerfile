@@ -85,10 +85,10 @@ RUN python3 -m venv /venv \
 # BUILD DEVTOOLSET
 FROM debian:buster-slim AS devtoolset-build
 
-COPY --from=base /go/src/github.com/tensorflow/tensorflow/tensorflow/tools/ci_build/devtoolset/build_devtoolset.sh /
-COPY --from=base /go/src/github.com/tensorflow/tensorflow/tensorflow/tools/ci_build/devtoolset/fixlinks.sh /
-COPY --from=base /go/src/github.com/tensorflow/tensorflow/tensorflow/tools/ci_build/devtoolset/platlib.patch /
-COPY --from=base /go/src/github.com/tensorflow/tensorflow/tensorflow/tools/ci_build/devtoolset/rpm-patch.sh /
+COPY --from=golang-base /go/src/github.com/tensorflow/tensorflow/tensorflow/tools/ci_build/devtoolset/build_devtoolset.sh /
+COPY --from=golang-base /go/src/github.com/tensorflow/tensorflow/tensorflow/tools/ci_build/devtoolset/fixlinks.sh /
+COPY --from=golang-base /go/src/github.com/tensorflow/tensorflow/tensorflow/tools/ci_build/devtoolset/platlib.patch /
+COPY --from=golang-base /go/src/github.com/tensorflow/tensorflow/tensorflow/tools/ci_build/devtoolset/rpm-patch.sh /
 
 WORKDIR /
 RUN apt-get update && apt-get -y install --no-install-recommends \
@@ -108,7 +108,7 @@ RUN /build_devtoolset.sh devtoolset-7 /dt7 \
 FROM tensorflow-build-base AS tensorflow-build
 
 # copy tensorflow source
-COPY --from=base /go/src/github.com/tensorflow/tensorflow /tensorflow
+COPY --from=golang-base /go/src/github.com/tensorflow/tensorflow /tensorflow
 
 # install protoc binary and libs
 COPY --from=protobuf-build /protobuf.tar.gz /opt/protobuf.tar.gz
