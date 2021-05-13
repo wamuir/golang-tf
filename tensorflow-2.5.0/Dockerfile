@@ -179,11 +179,12 @@ FROM golang-tf as demo
 WORKDIR /opt/build
 ARG TF_GO_VERS
 COPY tf.go .
-RUN go mod init tf-says-hello
-RUN go mod edit -require github.com/tensorflow/tensorflow@${TF_GO_VERS:-v$(date +"%Y.%-m.%-d")+incompatible}
-RUN go mod edit -replace github.com/tensorflow/tensorflow=${GOPATH}/src/github.com/tensorflow/tensorflow
-RUN go mod tidy
-RUN go get && go run tf.go
+RUN go mod init tf-says-hello \
+    && go mod edit -require github.com/tensorflow/tensorflow@${TF_GO_VERS:-v$(date +"%Y.%-m.%-d")+incompatible} \
+    && go mod edit -replace github.com/tensorflow/tensorflow=${GOPATH}/src/github.com/tensorflow/tensorflow \
+    && go mod tidy \
+    && go get \
+    && go run tf.go
 
 
 
