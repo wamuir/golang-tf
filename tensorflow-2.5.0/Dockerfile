@@ -1,19 +1,20 @@
 ARG BAZEL OPS="--config=release_cpu_linux"
 ARG USE_BAZEL_VERS="3.7.2"
 ARG PROTOBUF_VERS="3.15.8"
-ARG TENSORFLOW_VERS="2.5.0-rc3"
-ARG TF_SEMVAR=${TENSORFLOW_VERS:+v${TENSORFLOW_VERS}}
-ARG TF_GO_SEMVAR${TFV:+github.com/tensorflow/tensorflow@v${TFV}+incompatible}
+ARG TENSORFLOW_VERS="2.5.0"
+ARG TENSORFLOW_VERS_SUFFIX="-rc3"
+ARG TF_GIT_TAG=${TENSORFLOW_VERS:+v${TENSORFLOW_VERS}${TENSORFLOW_VERS_SUFFIX}}
+ARG TF_GO_VERS=${TENSORFLOW_VERS:+v${TENSORFLOW_VERS}+incompatible}
 
 
 
 # BASE GO IMAGE
-FROM golang:1.16-buster AS base
+FROM golang:1.16-buster AS golang-base
 
 # fetch tensorflow source
 WORKDIR ${GOPATH}/src/github.com/tensorflow/tensorflow
-ARG TF_SEMVAR
-RUN git clone --branch=${TF_SEMVAR:-master} --depth=1 https://github.com/tensorflow/tensorflow.git .
+ARG TF_GIT_TAG
+RUN git clone --branch=${TF_GIT_TAG:-master} --depth=1 https://github.com/tensorflow/tensorflow.git .
 
 # apply patch to add missing go package declarations to proto definitions (#48854)
 COPY 0001-add-go_package-to-proto-definition-files.patch .
@@ -22,6 +23,12 @@ RUN git apply 0001-add-go_package-to-proto-definition-files.patch
 # apply patch to write generated source code to tensorflow source / don't vendor (#48872)
 COPY 0001-simplify-generation-of-go-protos.patch .
 RUN git apply 0001-simplify-generation-of-go-protos.patch
+
+
+
+# BASE TENSORFLOW BUILD IMAGE
+FROM debian:buster-slim AS tensorflow-build-base
+
 
 
 
@@ -98,7 +105,7 @@ RUN /build_devtoolset.sh devtoolset-7 /dt7 \
 
 
 # BUILD TENSORFLOW
-FROM debian:buster-slim AS tensorflow-build
+FROM tensorflow-build-base AS tensorflow-build
 
 # copy tensorflow source
 COPY --from=base /go/src/github.com/tensorflow/tensorflow /tensorflow
@@ -140,7 +147,7 @@ RUN python3 -m venv /venv \
 
 
 # GET AND INSTALL TENSORFLOW/GO PACKAGE 
-FROM base AS golang-tf
+FROM golang-base AS golang-tf
 
 # install protoc binary and libs
 COPY --from=protobuf-build /protobuf.tar.gz /opt/protobuf.tar.gz
@@ -153,11 +160,9 @@ RUN tar xz -C /usr/local -f /opt/libtensorflow.tar.gz && rm /opt/libtensorflow.t
 # link shared libs
 RUN ldconfig
 
-
 # generate protocol buffers 
-ARG TF_GO_SEMVAR
 RUN cd ${GOPATH}/src/github.com/tensorflow/tensorflow \
-    && go mod init ${TF_GO_SEMVAR} \
+    && go mod init \
     && go generate github.com/tensorflow/tensorflow/tensorflow/go/op \
     && go mod tidy
 
@@ -172,10 +177,10 @@ FROM golang-tf as demo
 
 # hello from tensorflow (with go get)
 WORKDIR /opt/build
-ARG TF_GO_SEMVAR
+ARG TF_GO_VERS
 COPY tf.go .
 RUN go mod init tf-says-hello
-RUN go mod edit -require github.com/tensorflow/tensorflow@${TF_GO_SEMVAR:-latest}
+RUN go mod edit -require github.com/tensorflow/tensorflow@${TF_GO_VERS:-v$(date +"%Y.%-m.%-d")+incompatible}
 RUN go mod edit -replace github.com/tensorflow/tensorflow=${GOPATH}/src/github.com/tensorflow/tensorflow
 RUN go mod tidy
 RUN go get && go run tf.go
