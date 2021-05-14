@@ -14,7 +14,7 @@ docker pull wamuir/golang-tf
 Go modules (`go mod`) will work when using the image.  Use the `require` and `replace` flags as follows:
 
 ```sh
-go mod edit -require github.com/tensorflow/tensorflow@v2.4.1+incompatible
+go mod edit -require github.com/tensorflow/tensorflow@v2.5.0+incompatible
 go mod edit -replace github.com/tensorflow/tensorflow=/go/src/github.com/tensorflow/tensorflow
 ```
 
