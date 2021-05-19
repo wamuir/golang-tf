@@ -26,12 +26,6 @@ RUN git apply 0001-simplify-generation-of-go-protos.patch
 
 
 
-# BASE TENSORFLOW BUILD IMAGE
-FROM debian:buster-slim AS tensorflow-build-base
-
-
-
-
 # BUILD PROTOBUF
 FROM debian:buster-slim AS protobuf-build
 
@@ -82,30 +76,8 @@ RUN python3 -m venv /venv \
 
 
 
-# BUILD DEVTOOLSET
-FROM debian:buster-slim AS devtoolset-build
-
-COPY --from=golang-base /go/src/github.com/tensorflow/tensorflow/tensorflow/tools/ci_build/devtoolset/build_devtoolset.sh /
-COPY --from=golang-base /go/src/github.com/tensorflow/tensorflow/tensorflow/tools/ci_build/devtoolset/fixlinks.sh /
-COPY --from=golang-base /go/src/github.com/tensorflow/tensorflow/tensorflow/tools/ci_build/devtoolset/platlib.patch /
-COPY --from=golang-base /go/src/github.com/tensorflow/tensorflow/tensorflow/tools/ci_build/devtoolset/rpm-patch.sh /
-
-WORKDIR /
-RUN apt-get update && apt-get -y install --no-install-recommends \
-    build-essential \
-    cpio \
-    file \
-    flex \
-    rpm2cpio \
-    unar \
-    wget
-RUN /build_devtoolset.sh devtoolset-7 /dt7 \
-    && /build_devtoolset.sh devtoolset-8 /dt8
-
-
-
-# BUILD TENSORFLOW
-FROM tensorflow-build-base AS tensorflow-build
+# BASE TENSORFLOW BUILD IMAGE
+FROM debian:buster-slim AS tensorflow-build-base
 
 # copy tensorflow source
 COPY --from=golang-base /go/src/github.com/tensorflow/tensorflow /tensorflow
@@ -117,14 +89,14 @@ RUN tar xz -C /usr/local -f /opt/protobuf.tar.gz && rm /opt/protobuf.tar.gz
 # install bazel binary
 COPY --from=bazel-build /usr/local/bin/bazel /usr/local/bin/bazel
 
-# copy devtoolset
-COPY --from=devtoolset-build /dt7 /dt7
-COPY --from=devtoolset-build /dt8 /dt8
-
 # link shared libraries
 RUN ldconfig
 
-# build tensorflow
+
+
+# BUILD TENSORFLOW
+FROM tensorflow-build-base AS tensorflow-build
+
 WORKDIR /tensorflow
 ARG BAZEL_OPTS
 RUN mkdir -p /usr/share/man/man1 # bug for openjdk on slim variants / man directories missing
