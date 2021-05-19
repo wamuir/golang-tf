@@ -8,24 +8,6 @@ ARG TF_GO_VERS=${TENSORFLOW_VERS:+v${TENSORFLOW_VERS}+incompatible}
 
 
 
-# BASE GO IMAGE
-FROM golang:1.16-buster AS golang-base
-
-# fetch tensorflow source
-WORKDIR ${GOPATH}/src/github.com/tensorflow/tensorflow
-ARG TF_GIT_TAG
-RUN git clone --branch=${TF_GIT_TAG:-master} --depth=1 https://github.com/tensorflow/tensorflow.git .
-
-# apply patch to add missing go package declarations to proto definitions (#48854)
-COPY 0001-add-go_package-to-proto-definition-files.patch .
-RUN git apply 0001-add-go_package-to-proto-definition-files.patch
-
-# apply patch to write generated source code to tensorflow source / don't vendor (#48872)
-COPY 0001-simplify-generation-of-go-protos.patch .
-RUN git apply 0001-simplify-generation-of-go-protos.patch
-
-
-
 # BUILD PROTOBUF
 FROM debian:buster-slim AS protobuf-build
 
@@ -76,11 +58,8 @@ RUN python3 -m venv /venv \
 
 
 
-# BASE TENSORFLOW BUILD IMAGE
+# SET UP BASE TENSORFLOW BUILD IMAGE
 FROM debian:buster-slim AS tensorflow-build-base
-
-# copy tensorflow source
-COPY --from=golang-base /go/src/github.com/tensorflow/tensorflow /tensorflow
 
 # install protoc binary and libs
 COPY --from=protobuf-build /protobuf.tar.gz /opt/protobuf.tar.gz
@@ -91,6 +70,22 @@ COPY --from=bazel-build /usr/local/bin/bazel /usr/local/bin/bazel
 
 # link shared libraries
 RUN ldconfig
+
+# fetch tensorflow source
+WORKDIR /tensorflow
+ARG TF_GIT_TAG
+RUN apt-get update && apt-get -y install --no-install-recommends \
+    ca-certificates \
+    git
+RUN git clone --branch=${TF_GIT_TAG:-master} --depth=1 https://github.com/tensorflow/tensorflow.git .
+
+# apply patch to add missing go package declarations to proto definitions (#48854)
+COPY 0001-add-go_package-to-proto-definition-files.patch .
+RUN git apply 0001-add-go_package-to-proto-definition-files.patch
+
+# apply patch to write generated source code to tensorflow source / don't vendor (#48872)
+COPY 0001-simplify-generation-of-go-protos.patch .
+RUN git apply 0001-simplify-generation-of-go-protos.patch
 
 
 
@@ -118,8 +113,8 @@ RUN python3 -m venv /venv \
 
 
 
-# GET AND INSTALL TENSORFLOW/GO PACKAGE 
-FROM golang-base AS golang-tf
+# INSTALL TENSORFLOW/GO PACKAGE
+FROM golang:1.16-buster AS golang-tf
 
 # install protoc binary and libs
 COPY --from=protobuf-build /protobuf.tar.gz /opt/protobuf.tar.gz
@@ -132,35 +127,17 @@ RUN tar xz -C /usr/local -f /opt/libtensorflow.tar.gz && rm /opt/libtensorflow.t
 # link shared libs
 RUN ldconfig
 
+# copy tensorflow source
+COPY --from=tensorflow-build-base /tensorflow ${GOPATH}/src/github.com/tensorflow/tensorflow
+
 # generate protocol buffers 
 RUN cd ${GOPATH}/src/github.com/tensorflow/tensorflow \
     && go mod init \
     && go generate github.com/tensorflow/tensorflow/tensorflow/go/op \
     && go mod tidy
 
-# test tensorflow/go modules
+# test tensorflow/go
 RUN go test github.com/tensorflow/tensorflow/tensorflow/go \
     && go test github.com/tensorflow/tensorflow/tensorflow/go/op
-
-
-
-# DEMO TENSORFLOW/GO
-FROM golang-tf as demo
-
-# hello from tensorflow (with go get)
-WORKDIR /opt/build
-ARG TF_GO_VERS
-COPY tf.go .
-RUN go mod init tf-says-hello \
-    && go mod edit -require github.com/tensorflow/tensorflow@${TF_GO_VERS:-v$(date +"%Y.%-m.%-d")+incompatible} \
-    && go mod edit -replace github.com/tensorflow/tensorflow=${GOPATH}/src/github.com/tensorflow/tensorflow \
-    && go mod tidy \
-    && go get \
-    && go run tf.go
-
-
-
-# FINAL STAGE
-FROM golang-tf
 
 WORKDIR ${GOPATH}
