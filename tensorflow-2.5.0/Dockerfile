@@ -89,7 +89,7 @@ RUN git apply 0001-simplify-generation-of-go-protos.patch
 
 
 
-# BUILD TENSORFLOW
+# BUILD AND TEST LIBTENSORFLOW
 FROM tensorflow-build-base AS tensorflow-build
 
 WORKDIR /tensorflow
@@ -113,8 +113,8 @@ RUN python3 -m venv /venv \
 
 
 
-# INSTALL TENSORFLOW/GO PACKAGE
-FROM golang:1.16-buster AS golang-tf
+# SET UP BASE GOLANG IMAGE
+FROM golang:1.16-buster AS golang-tf-base
 
 # install protoc binary and libs
 COPY --from=protobuf-build /protobuf.tar.gz /opt/protobuf.tar.gz
@@ -130,6 +130,11 @@ RUN ldconfig
 # copy tensorflow source
 COPY --from=tensorflow-build-base /tensorflow ${GOPATH}/src/github.com/tensorflow/tensorflow
 
+
+
+# INSTALL AND TEST TENSORFLOW/GO PACKAGE
+FROM golang-tf-base as golang-tf
+
 # generate protocol buffers 
 RUN cd ${GOPATH}/src/github.com/tensorflow/tensorflow \
     && go mod init \
@@ -137,7 +142,8 @@ RUN cd ${GOPATH}/src/github.com/tensorflow/tensorflow \
     && go mod tidy
 
 # test tensorflow/go
-RUN go test github.com/tensorflow/tensorflow/tensorflow/go \
+RUN cd ${GOPATH}/src/github.com/tensorflow/tensorflow \
+    && go test github.com/tensorflow/tensorflow/tensorflow/go \
     && go test github.com/tensorflow/tensorflow/tensorflow/go/op
 
 WORKDIR ${GOPATH}
