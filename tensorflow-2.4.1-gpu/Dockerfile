@@ -1,219 +1,268 @@
-ARG BAZEL_OPTS="--config=opt --config=cuda --cxxopt=-D_GLIBCXX_USE_CXX11_ABI=0"
+ARG BAZEL OPS="--config=release_gpu_linux"
 ARG USE_BAZEL_VERS="3.1.0"
 ARG PROTOBUF_VERS="3.14.0"
 ARG TENSORFLOW_VERS="2.4.1"
+ARG TENSORFLOW_VERS_SUFFIX=""
+ARG TF_GIT_TAG=${TENSORFLOW_VERS:+v${TENSORFLOW_VERS}${TENSORFLOW_VERS_SUFFIX}}
+ARG TF_GO_VERS=${TENSORFLOW_VERS:+v${TENSORFLOW_VERS}+incompatible}
 
-
-FROM golang:1.16-buster AS base
-
-
-### cuda part one
-# https://gitlab.com/nvidia/container-images/cuda/-/blob/f08ab8553644c74e146e634d3e2e79de466bcbca/dist/11.0/ubuntu18.04-x86_64/base/Dockerfile
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gnupg2 curl ca-certificates && \
-    curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/7fa2af80.pub | apt-key add - && \
-    echo "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64 /" > /etc/apt/sources.list.d/cuda.list && \
-    echo "deb https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1804/x86_64 /" > /etc/apt/sources.list.d/nvidia-ml.list && \
-    apt-get purge --autoremove -y curl \
-    && rm -rf /var/lib/apt/lists/*
-
-
-ENV CUDA_VERSION 11.0.3
-
-# For libraries in the cuda-compat-* package: https://docs.nvidia.com/cuda/eula/index.html#attachment-a
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    cuda-cudart-11-0=11.0.221-1 \
-    cuda-compat-11-0 \
-    && ln -s cuda-11.0 /usr/local/cuda && \
-    rm -rf /var/lib/apt/lists/*
-
-# Required for nvidia-docker v1
-RUN echo "/usr/local/nvidia/lib" >> /etc/ld.so.conf.d/nvidia.conf && \
-    echo "/usr/local/nvidia/lib64" >> /etc/ld.so.conf.d/nvidia.conf
-
-ENV PATH /usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
-ENV LD_LIBRARY_PATH /usr/local/nvidia/lib:/usr/local/nvidia/lib64
-
-# nvidia-container-runtime
-ENV NVIDIA_VISIBLE_DEVICES all
-ENV NVIDIA_DRIVER_CAPABILITIES compute,utility
-ENV NVIDIA_REQUIRE_CUDA "cuda>=11.0 brand=tesla,driver>=418,driver<419 brand=tesla,driver>=440,driver<441 brand=tesla,driver>=450,driver<451"
-
-
-
-### cuda part two
-# https://github.com/tensorflow/tensorflow/blob/v2.4.1/tensorflow/tools/dockerfiles/dockerfiles/gpu.Dockerfile
 ARG CUDA=11.0
+ARG CUDA_VERSION 11.0.3
 ARG CUDNN=8.0.5.39-1
 ARG CUDNN_MAJOR_VERSION=8
 ARG LIB_DIR_PREFIX=x86_64
 ARG LIBNVINFER=7.1.3-1
 ARG LIBNVINFER_MAJOR_VERSION=7
-
-# Needed for string substitution
-SHELL ["/bin/bash", "-c"]
-# Pick up some TF dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        build-essential \
-        cuda-command-line-tools-${CUDA/./-} \
-        libcublas-${CUDA/./-} \
-        cuda-nvrtc-${CUDA/./-} \
-        libcufft-${CUDA/./-} \
-        libcurand-${CUDA/./-} \
-        libcusolver-${CUDA/./-} \
-        libcusparse-${CUDA/./-} \
-        curl \
-        libcudnn8=${CUDNN}+cuda${CUDA} \
-        libfreetype6-dev \
-        libhdf5-serial-dev \
-        libzmq3-dev \
-        pkg-config \
-        software-properties-common \
-        unzip
-
-# Install TensorRT if not building for PowerPC
-RUN [[ "${ARCH}" = "ppc64le" ]] || { apt-get update && \
-        apt-get install -y --no-install-recommends libnvinfer${LIBNVINFER_MAJOR_VERSION}=${LIBNVINFER}+cuda${CUDA} \
-        libnvinfer-plugin${LIBNVINFER_MAJOR_VERSION}=${LIBNVINFER}+cuda${CUDA} \
-        && apt-get clean \
-        && rm -rf /var/lib/apt/lists/*; }
-
-
-# For CUDA profiling, TensorFlow requires CUPTI.
-ENV LD_LIBRARY_PATH /usr/local/cuda/extras/CUPTI/lib64:/usr/local/cuda/lib64:$LD_LIBRARY_PATH
-
-# Link the libcuda stub to the location where tensorflow is searching for it and reconfigure
-# dynamic linker run-time bindings
-RUN ls -l /usr/local/cuda/lib64/
-RUN ln -s /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1 \
-    && echo "/usr/local/cuda/lib64/stubs" > /etc/ld.so.conf.d/z-cuda-stubs.conf \
-    && ldconfig
-
-
-# See http://bugs.python.org/issue19846
-ENV LANG C.UTF-8
+ARG TF_CUDA_COMPUTE_CAPABILITIES=3.5,7.5,8.6
+ARG TF_CUDA_VERSION=11
+ARG TF_TENSORRT_VERSION=7
 
 
 
-# fetch tensorflow source
-ARG TENSORFLOW_VERS
-ARG TFV=${TENSORFLOW_VERS:+v${TENSORFLOW_VERS}}
-WORKDIR ${GOPATH}/src/github.com/tensorflow/tensorflow
-RUN git clone https://github.com/tensorflow/tensorflow.git . \
-    && git checkout ${TFV:-master}
+# BUILD PROTOBUF
+FROM debian:buster-slim AS protobuf-build
 
-# build libtensorflow
-FROM base as builder
-
-RUN apt-get update
-
-# build python venv and install numpy
-RUN apt-get -y install --no-install-recommends \
-    libpython3-dev \
-    python3 \
-    python3-venv
-RUN python3 -m venv /venv \
-    && . /venv/bin/activate \
-    && python3 -m pip install numpy
-
-# build protoc
 WORKDIR /protobuf
 ARG PROTOBUF_VERS
-RUN apt-get -y install --no-install-recommends \
+RUN apt-get update && apt-get -y install --no-install-recommends \
     automake \
     autotools-dev \
+    build-essential \
+    ca-certificates \
+    git \
     libtool
 RUN git clone --recurse-submodules https://github.com/protocolbuffers/protobuf.git . \
     && ./autogen.sh \
     && ./configure \
     && cd src \
-    && make -j8 protoc \
+    && make -j$(nproc) protoc \
     && make install \
     && make install DESTDIR=/protobuf/build \
     && tar -czf /protobuf.tar.gz -C /protobuf/build/usr/local .
 
-# build bazel
+
+
+# BUILD BAZEL
+FROM debian:buster-slim AS bazel-build
+
 WORKDIR /bazel
 ARG USE_BAZEL_VERS
-RUN apt-get -y install --no-install-recommends \
+RUN mkdir -p /usr/share/man/man1 # bug for openjdk on slim variants / man directories missing
+RUN apt-get update && apt-get -y install --no-install-recommends \
     build-essential \
+    curl \
+    libpython3-dev \
+    openjdk-11-jdk-headless \
     patch \
     python3 \
-    software-properties-common \
+    python3-venv \
     unzip \
-    wget \
     zip
-RUN wget -qO - https://adoptopenjdk.jfrog.io/adoptopenjdk/api/gpg/key/public | apt-key add - \
-    && add-apt-repository --yes https://adoptopenjdk.jfrog.io/adoptopenjdk/deb/ \
-    && apt-get update && apt-get install -y adoptopenjdk-8-hotspot
-SHELL ["/bin/sh", "-c"]
-RUN curl -fSsL https://github.com/bazelbuild/bazel/releases/download/${USE_BAZEL_VERS}/bazel-${USE_BAZEL_VERS}-dist.zip \
-    -o bazel-dist.zip \
-    && python3 -m zipfile -e bazel-dist.zip .
-RUN echo '@@ -89 +89,2 @@\n-  return "/proc/self/exe";\n+  static char path[PATH_MAX];\n+  return realpath("/proc/self/exe", path);' | patch src/main/cpp/blaze_util_linux.cc \
+RUN python3 -m venv /venv \
+    && . /venv/bin/activate \
+    && curl -fSsL https://github.com/bazelbuild/bazel/releases/download/${USE_BAZEL_VERS}/bazel-${USE_BAZEL_VERS}-dist.zip -o bazel-dist.zip \
+    && unzip bazel-dist.zip \
+    && echo '@@ -89 +89,2 @@\n-  return "/proc/self/exe";\n+  static char path[PATH_MAX];\n+  return realpath("/proc/self/exe", path);' \
+       | patch src/main/cpp/blaze_util_linux.cc \
     && env EXTRA_BAZEL_ARGS="--host_javabase=@local_jdk//:jdk" bash ./compile.sh \
-    && cp output/bazel /usr/local/bin/ 
+    && mv /bazel/output/bazel /usr/local/bin/bazel
 
-# uncomment to use bazelisk instead of building bazel (amd64 only)
-# ARG USE_BAZEL_VERS
-# RUN go get github.com/bazelbuild/bazelisk \
-#    && ln -s ${GOPATH}/bin/bazelisk /usr/bin/bazel
 
-# build c lib for tensorflow
-WORKDIR ${GOPATH}/src/github.com/tensorflow/tensorflow
-ARG BAZEL_OPTS
-ARG CC_OPT_FLAGS
-RUN apt-get -y install --no-install-recommends \
+
+# BUILD DEVTOOLSET
+FROM debian:buster-slim AS devtoolset-build
+
+COPY --from=golang-base /go/src/github.com/tensorflow/tensorflow/tensorflow/tools/ci_build/devtoolset/build_devtoolset.sh /
+COPY --from=golang-base /go/src/github.com/tensorflow/tensorflow/tensorflow/tools/ci_build/devtoolset/fixlinks.sh /
+COPY --from=golang-base /go/src/github.com/tensorflow/tensorflow/tensorflow/tools/ci_build/devtoolset/platlib.patch /
+COPY --from=golang-base /go/src/github.com/tensorflow/tensorflow/tensorflow/tools/ci_build/devtoolset/rpm-patch.sh /
+
+WORKDIR /
+RUN apt-get update && apt-get -y install --no-install-recommends \
     build-essential \
+    cpio \
+    file \
+    flex \
+    rpm2cpio \
+    unar \
+    wget
+RUN /build_devtoolset.sh devtoolset-7 /dt7 \
+    && /build_devtoolset.sh devtoolset-8 /dt8
+
+
+
+# SET UP BASE TENSORFLOW BUILD IMAGE
+FROM debian:buster-slim AS tensorflow-build-base
+
+# install protoc binary and libs
+COPY --from=protobuf-build /protobuf.tar.gz /opt/protobuf.tar.gz
+RUN tar xz -C /usr/local -f /opt/protobuf.tar.gz && rm /opt/protobuf.tar.gz
+
+# install bazel binary
+COPY --from=bazel-build /usr/local/bin/bazel /usr/local/bin/bazel
+
+# link shared libraries
+RUN ldconfig
+
+# copy devtoolset
+COPY --from=devtoolset-build /dt7 /dt7
+COPY --from=devtoolset-build /dt8 /dt8
+
+# fetch tensorflow source
+WORKDIR /tensorflow
+ARG TF_GIT_TAG
+RUN apt-get update && apt-get -y install --no-install-recommends \
+    ca-certificates \
+    git
+RUN git clone --branch=${TF_GIT_TAG:-master} --depth=1 https://github.com/tensorflow/tensorflow.git .
+
+# apply patch to write generated source code to tensorflow source / don't vendor (#48872)
+COPY 0001-simplify-generation-of-go-protos.patch .
+RUN git apply 0001-simplify-generation-of-go-protos.patch
+
+
+ARG TF_CUDA_VERSION
+ARG TF_CUDNN_VERSION
+ARG TF_TENSORRT_VERSION
+ARG TF_COMPUTE_CAPABILITIES
+
+ENV TF_NEED_CUDA=TRUE
+ENV TF_CUDA_VERSION=${TF_CUDA_VERSION}
+ENV TF_CUDNN_VERSION=${TF_CUDNN_VERSION}
+ENV TF_NEED_TENSORRT=TRUE
+ENV TF_TENSORRT_VERSION=${TF_TENSORRT_VERSION}
+ENV TF_CUDA_COMPUTE_CAPABILITIES=${TF_CUDA_COMPUTE_CAPABILITIES}
+
+# source cuda package repos
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    gnupg2
+RUN curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/7fa2af80.pub | apt-key add - \
+    && echo "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64 /" > /etc/apt/sources.list.d/cuda.list \
+    && echo "deb https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1804/x86_64 /" > /etc/apt/sources.list.d/nvidia-ml.list
+
+# install cuda build dependencies
+# note: bash needed for string substitution
+SHELL ["/bin/bash", "-c"]
+ARG CUDA
+ARG CUDNN
+ARG CUDNN_MAJOR_VERSION
+ARG LIBNVINFER=7.1.3-1
+ARG LIBNVINFER_MAJOR_VERSION=7
+RUN apt-get update && apt-get -y install --no-install-recommends \
+    cuda-command-line-tools-${CUDA/./-} \
+    cuda-compat-${CUDA/./-} \
+    cuda-cudart-${CUDA/./-} \
+    cuda-libraries-dev-${CUDA/./-} \
+    cuda-nvcc-${CUDA/./-} \
+    cuda-nvprune-${CUDA/./-} \
+    libcudnn${CUDNN_MAJOR_VERSION}=${CUDNN}+cuda${CUDA} \
+    libcudnn${CUDNN_MAJOR_VERSION}-dev=${CUDNN}+cuda${CUDA} \
+    libnvinfer-dev${LIBNVINFER_MAJOR_VERSION}=${LIBNVINFER}+cuda${CUDA} \
+    libnvinfer-plugin${LIBNVINFER_MAJOR_VERSION}=${LIBNVINFER}+cuda${CUDA}
+
+ENV PATH /usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
+ENV LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/cuda/extras/CUPTI/lib64:/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/cuda/lib64
+RUN ln -s cuda-11.2 /usr/local/cuda \
+    && ln -s /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1 \
+    && echo "/usr/local/cuda/lib64/stubs" > /etc/ld.so.conf.d/z-cuda-stubs.conf \
+    && ldconfig
+
+
+
+# BUILD AND TEST LIBTENSORFLOW
+FROM tensorflow-build-base AS tensorflow-build
+
+WORKDIR /tensorflow
+ARG BAZEL_OPTS
+RUN mkdir -p /usr/share/man/man1 # bug for openjdk on slim variants / man directories missing
+RUN apt-get update && apt-get -y install --no-install-recommends \
+    build-essential \
+    git \
+    libpython3-dev \
+    openjdk-11-jdk-headless \
+    python3 \
+    python3-venv \
     swig
-RUN apt-get -y install \
-    cuda-libraries-dev-11-0 \
-    libcudnn8-dev=8.0.5.39-1+cuda11.0
-ARG TF_NEED_CUDA=TRUE
-ARG TF_CUDA_VERSION=11
-ARG TF_CUDNN_VERSION=8
-RUN . /venv/bin/activate \
-    && export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/extras/CUPTI/lib64 \
+RUN python3 -m venv /venv \
+    && . /venv/bin/activate \
+    && python3 -m pip install numpy \
     && ./configure \
-    && . /venv/bin/activate && bazel build ${BAZEL_OPTS} //tensorflow/tools/lib_package:libtensorflow.tar.gz \
+    && bazel test ${BAZEL_OPTS} //tensorflow/tools/lib_package:libtensorflow_test \
+    && bazel build ${BAZEL_OPTS} //tensorflow/tools/lib_package:libtensorflow.tar.gz \
     && mv bazel-bin/tensorflow/tools/lib_package/libtensorflow.tar.gz /libtensorflow.tar.gz
 
 
-FROM base as golang-tf
+
+# SET UP BASE GOLANG IMAGE
+FROM golang:1.16-buster AS golang-tf-base
 
 # install protoc binary and libs
-COPY --from=builder /protobuf.tar.gz /opt/protobuf.tar.gz
+COPY --from=protobuf-build /protobuf.tar.gz /opt/protobuf.tar.gz
 RUN tar xz -C /usr/local -f /opt/protobuf.tar.gz && rm /opt/protobuf.tar.gz
 
 # install c lib for tensorflow
-COPY --from=builder /libtensorflow.tar.gz /opt/libtensorflow.tar.gz
+COPY --from=tensorflow-build /libtensorflow.tar.gz /opt/libtensorflow.tar.gz
 RUN tar xz -C /usr/local -f /opt/libtensorflow.tar.gz && rm /opt/libtensorflow.tar.gz
 
 # link shared libs
 RUN ldconfig
 
+# copy tensorflow source
+COPY --from=tensorflow-build-base /tensorflow ${GOPATH}/src/github.com/tensorflow/tensorflow
+
+# source cuda package repos
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    gnupg2
+RUN curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/7fa2af80.pub | apt-key add - \
+    && echo "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64 /" > /etc/apt/sources.list.d/cuda.list \
+    && echo "deb https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1804/x86_64 /" > /etc/apt/sources.list.d/nvidia-ml.list
+
+# install tf dependencies
+# note: bash needed for string substitution
+SHELL ["/bin/bash", "-c"]
+ARG CUDA
+ARG CUDNN
+ARG CUDNN_MAJOR_VERSION
+ARG LIBNVINFER
+ARG LIBNVINFER_MAJOR_VERSION
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    cuda-cudart-${CUDA/./-} \
+    cuda-command-line-tools-${CUDA/./-} \
+    cuda-compat-${CUDA/./-} \
+    cuda-nvrtc-${CUDA/./-} \
+    libcublas-${CUDA/./-} \
+    libcudnn8=${CUDNN}+cuda${CUDA} \
+    libcufft-${CUDA/./-} \
+    libcurand-${CUDA/./-} \
+    libcusolver-${CUDA/./-} \
+    libcusparse-${CUDA/./-} \
+    libnvinfer${LIBNVINFER_MAJOR_VERSION}=${LIBNVINFER}+cuda${CUDA} \
+    libnvinfer-plugin${LIBNVINFER_MAJOR_VERSION}=${LIBNVINFER}+cuda${CUDA}
+
+ENV LD_LIBRARY_PATH /usr/local/cuda/extras/CUPTI/lib64:/usr/local/cuda/lib64:$LD_LIBRARY_PATH
+RUN ln -s cuda-11.2 /usr/local/cuda \
+    && ln -s /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1 \
+    && echo "/usr/local/cuda/lib64/stubs" > /etc/ld.so.conf.d/z-cuda-stubs.conf \
+    && ldconfig
+
+
+
+# INSTALL AND TEST TENSORFLOW/GO PACKAGE
+FROM golang-tf-base as golang-tf
+
 # generate protocol buffers 
 RUN cd ${GOPATH}/src/github.com/tensorflow/tensorflow \
     && go mod init \
-    && go generate github.com/tensorflow/tensorflow/tensorflow/go/op || true \
-    && cd ${GOPATH}/src/github.com/tensorflow/tensorflow/tensorflow/go \
-    && mv vendor/github.com/tensorflow/tensorflow/tensorflow/go/* . \
-    && go mod tidy \
-    && go test github.com/tensorflow/tensorflow/tensorflow/go
+    && go generate github.com/tensorflow/tensorflow/tensorflow/go/op \
+    && go mod tidy
 
-# demo golang-tf
-FROM golang-tf as demo
-
-# hello from tensorflow (with go get)
-WORKDIR /opt/build
-COPY tf.go .
-RUN go mod init tf-says-hello
-RUN go mod edit -require github.com/tensorflow/tensorflow@v${TENSORFLOW_VERS:-$(date +"%Y.%-m.%-d")}+incompatible
-RUN go mod edit -replace github.com/tensorflow/tensorflow=${GOPATH}/src/github.com/tensorflow/tensorflow
-RUN go mod tidy
-RUN go get && go run tf.go
-
-# final stage
-FROM golang-tf
+# test tensorflow/go
+RUN cd ${GOPATH}/src/github.com/tensorflow/tensorflow \
+    && go test github.com/tensorflow/tensorflow/tensorflow/go \
+    && go test github.com/tensorflow/tensorflow/tensorflow/go/op
 
 WORKDIR ${GOPATH}
