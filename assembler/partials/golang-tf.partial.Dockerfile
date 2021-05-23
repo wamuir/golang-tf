@@ -16,4 +16,13 @@ RUN cd ${GOPATH}/src/github.com/tensorflow/tensorflow \
     && go test github.com/tensorflow/tensorflow/tensorflow/go \
     && go test github.com/tensorflow/tensorflow/tensorflow/go/op
 
+# add example app
+COPY example-usage /example-app
+ARG TF_GO_VERS
+RUN cd /example-app \
+    && go mod init example-app \
+    && go mod edit -require github.com/tensorflow/tensorflow@${TF_GO_VERS} \
+    && go mod edit -replace github.com/tensorflow/tensorflow=${GOPATH}/src/github.com/tensorflow/tensorflow \
+    && go mod tidy
+
 WORKDIR ${GOPATH}

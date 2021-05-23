@@ -2,6 +2,10 @@
 
 # SET UP BASE GOLANG IMAGE
 FROM golang:1.16-buster AS golang-tf-base
+ARG TF_GIT_TAG 
+ARG TF_GO_VERS
+ENV TF_GIT_TAG=${TF_GIT_TAG}
+ENV TF_GO_VERS=${TF_GO_VERS}
 
 # install protoc binary and libs
 COPY --from=protobuf-build /protobuf.tar.gz /opt/protobuf.tar.gz
