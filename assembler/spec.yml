@@ -28,9 +28,11 @@ header: |
     # throughout. Refer to github.com/wamuir/golang-tf for further information.
 
 releases:
+
     versioned:
         tag_specs:
             - "{test}{golang-tf}"
+
     dockerfiles:
         is_dockerfiles: true
         upload_images: false
@@ -38,6 +40,14 @@ releases:
             - "{variants}{golang-tf}"
 
 slice_sets:
+
+    golang-tf:
+        - add_to_name: ""
+          partials:
+              - golang-tf
+          tests:
+              - run.sh
+
     test:
         - add_to_name: "2.4.1"
           dockerfile_exclusive_name: "tensorflow-2.4.1/cpu"
@@ -52,6 +62,7 @@ slice_sets:
               - tensorflow-build-base
               - tensorflow-build
               - golang-tf-base
+
     variants:
         - add_to_name: "1.15.5"
           dockerfile_exclusive_name: "tensorflow-1.15.5/cpu"
@@ -122,8 +133,3 @@ slice_sets:
               - tensorflow-build
               - golang-tf-base
               - golang-tf-base-cuda
-
-    golang-tf:
-        - add_to_name: ""
-          partials:
-              - golang-tf
