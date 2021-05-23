@@ -1,0 +1,29 @@
+From 34901a724810c1e664f1cfc5285d13e015a877cf Mon Sep 17 00:00:00 2001
+From: "A. Unique TensorFlower" <gardener@tensorflow.org>
+Date: Thu, 5 Dec 2019 14:32:08 -0800
+Subject: [PATCH] genop: fix template error
+
+Rewrite a conditional in a template to be syntactically valid.
+
+PiperOrigin-RevId: 284055201
+Change-Id: Ie0129e7553857076e60e4d5d85e912a7893168d9
+---
+ tensorflow/go/genop/internal/genop.go | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/tensorflow/go/genop/internal/genop.go b/tensorflow/go/genop/internal/genop.go
+index 15c125e3cf7..230462b6e7d 100644
+--- a/tensorflow/go/genop/internal/genop.go
++++ b/tensorflow/go/genop/internal/genop.go
+@@ -265,7 +265,7 @@ func {{$.Op.Name}}{{CamelCase .RenameTo}}(value {{GoType .Type}}) {{$.Op.Name}}A
+ {{- else }}
+ {{- if .DescribeOutputs}}
+ //
+-{{- if ((len .OutArgs) eq 1) }}
++{{- if eq (len .OutArgs) 1 }}
+ // Returns {{range .OutArgs}}{{MakeComment .Description}}{{end}}
+ {{- else }}
+ // Returns:
+-- 
+2.31.1
+

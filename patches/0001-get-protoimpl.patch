@@ -1,0 +1,12 @@
+diff --git a/tensorflow/go/genop/generate.sh b/tensorflow/go/genop/generate.sh
+index 446ddbe35a5..6a520468a54 100644
+--- a/tensorflow/go/genop/generate.sh
++++ b/tensorflow/go/genop/generate.sh
+@@ -18,6 +18,7 @@ set -e
+
+ go get github.com/golang/protobuf/proto
+ go get github.com/golang/protobuf/protoc-gen-go
++go get google.golang.org/protobuf/runtime/protoimpl
+
+ if [ -z "${GOPATH}" ]
+ then
