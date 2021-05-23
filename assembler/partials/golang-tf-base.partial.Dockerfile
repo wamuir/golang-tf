@@ -20,3 +20,6 @@ RUN ldconfig
 
 # copy tensorflow source
 COPY --from=tensorflow-source /tensorflow ${GOPATH}/src/github.com/tensorflow/tensorflow
+
+# add bashrc
+COPY bashrc /root/.bashrc
