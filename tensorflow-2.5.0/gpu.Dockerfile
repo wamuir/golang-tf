@@ -1,10 +1,40 @@
-ARG BAZEL OPS="--config=release_gpu_linux"
+# MIT License
+#
+# Copyright (c) 2020 William Muir
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+# 
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+# ============================================================================
+#
+# THIS IS A GENERATED DOCKERFILE.
+#
+# This file was assembled from multiple pieces, whose use is documented
+# throughout. Refer to github.com/wamuir/golang-tf for further information.
+
 ARG USE_BAZEL_VERS="3.7.2"
 ARG PROTOBUF_VERS="3.15.8"
 ARG TENSORFLOW_VERS="2.5.0"
 ARG TENSORFLOW_VERS_SUFFIX=""
 ARG TF_GIT_TAG=${TENSORFLOW_VERS:+v${TENSORFLOW_VERS}${TENSORFLOW_VERS_SUFFIX}}
 ARG TF_GO_VERS=${TENSORFLOW_VERS:+v${TENSORFLOW_VERS}+incompatible}
+
+ARG BAZEL_OPTS="--config=release_gpu_linux"
+ARG CC_OPT_FLAGS=""
 
 ARG CUDA=11.2
 ARG CUDA_VERSION 11.2.2
@@ -16,6 +46,9 @@ ARG LIBNVINFER_MAJOR_VERSION=7
 ARG TF_CUDA_COMPUTE_CAPABILITIES=3.5,7.5,8.6
 ARG TF_CUDA_VERSION=11
 ARG TF_TENSORRT_VERSION=7
+
+# note: this libnvinfer uses cuda11.1 versions 
+ARG LIBNVINFER_CUDA=11.1
 
 
 
@@ -31,7 +64,7 @@ RUN apt-get update && apt-get -y install --no-install-recommends \
     ca-certificates \
     git \
     libtool
-RUN git clone --recurse-submodules https://github.com/protocolbuffers/protobuf.git . \
+RUN git clone --branch=v${PROTOBUF_VERS} --depth=1 --recurse-submodules https://github.com/protocolbuffers/protobuf.git . \
     && ./autogen.sh \
     && ./configure \
     && cd src \
@@ -69,13 +102,33 @@ RUN python3 -m venv /venv \
 
 
 
+# GET TENSORFLOW SOURCE
+FROM debian:buster-slim AS tensorflow-source
+
+WORKDIR /tensorflow
+ARG TF_GIT_TAG
+RUN apt-get update && apt-get -y install --no-install-recommends \
+    ca-certificates \
+    git
+RUN git clone --branch=${TF_GIT_TAG:-master} --depth=1 https://github.com/tensorflow/tensorflow.git .
+
+# apply patch to add missing go package declarations to proto definitions (#48854)
+COPY patches/0001-add-go_package-to-proto-definition-files.patch .
+RUN git apply 0001-add-go_package-to-proto-definition-files.patch
+
+# apply patch to write generated source code to tensorflow source / don't vendor (#48872)
+COPY patches/0001-simplify-generation-of-go-protos.patch .
+RUN git apply 0001-simplify-generation-of-go-protos.patch
+
+
+
 # BUILD DEVTOOLSET
 FROM debian:buster-slim AS devtoolset-build
 
-COPY --from=golang-base /go/src/github.com/tensorflow/tensorflow/tensorflow/tools/ci_build/devtoolset/build_devtoolset.sh /
-COPY --from=golang-base /go/src/github.com/tensorflow/tensorflow/tensorflow/tools/ci_build/devtoolset/fixlinks.sh /
-COPY --from=golang-base /go/src/github.com/tensorflow/tensorflow/tensorflow/tools/ci_build/devtoolset/platlib.patch /
-COPY --from=golang-base /go/src/github.com/tensorflow/tensorflow/tensorflow/tools/ci_build/devtoolset/rpm-patch.sh /
+COPY --from=tensorflow-source /tensorflow/tensorflow/tools/ci_build/devtoolset/build_devtoolset.sh /
+COPY --from=tensorflow-source /tensorflow/tensorflow/tools/ci_build/devtoolset/fixlinks.sh /
+COPY --from=tensorflow-source /tensorflow/tensorflow/tools/ci_build/devtoolset/platlib.patch /
+COPY --from=tensorflow-source /tensorflow/tensorflow/tools/ci_build/devtoolset/rpm-patch.sh /
 
 WORKDIR /
 RUN apt-get update && apt-get -y install --no-install-recommends \
@@ -108,22 +161,8 @@ RUN ldconfig
 COPY --from=devtoolset-build /dt7 /dt7
 COPY --from=devtoolset-build /dt8 /dt8
 
-# fetch tensorflow source
-WORKDIR /tensorflow
-ARG TF_GIT_TAG
-RUN apt-get update && apt-get -y install --no-install-recommends \
-    ca-certificates \
-    git
-RUN git clone --branch=${TF_GIT_TAG:-master} --depth=1 https://github.com/tensorflow/tensorflow.git .
-
-# apply patch to add missing go package declarations to proto definitions (#48854)
-COPY 0001-add-go_package-to-proto-definition-files.patch .
-RUN git apply 0001-add-go_package-to-proto-definition-files.patch
-
-# apply patch to write generated source code to tensorflow source / don't vendor (#48872)
-COPY 0001-simplify-generation-of-go-protos.patch .
-RUN git apply 0001-simplify-generation-of-go-protos.patch
-
+# copy tensorflow source
+COPY --from=tensorflow-source /tensorflow /tensorflow
 
 ARG TF_CUDA_VERSION
 ARG TF_CUDNN_VERSION
@@ -152,6 +191,9 @@ SHELL ["/bin/bash", "-c"]
 ARG CUDA
 ARG CUDNN
 ARG CUDNN_MAJOR_VERSION
+ARG LIBNVINFER
+ARG LIBNVINFER_CUDA=${LIBNVINFER_CUDA:-${CUDA}}
+ARG LIBNVINFER_MAJOR_VERSION
 RUN apt-get update && apt-get -y install --no-install-recommends \
     cuda-command-line-tools-${CUDA/./-} \
     cuda-compat-${CUDA/./-} \
@@ -161,12 +203,14 @@ RUN apt-get update && apt-get -y install --no-install-recommends \
     cuda-nvprune-${CUDA/./-} \
     libcudnn${CUDNN_MAJOR_VERSION}=${CUDNN}+cuda${CUDA} \
     libcudnn${CUDNN_MAJOR_VERSION}-dev=${CUDNN}+cuda${CUDA} \
-    libnvinfer-dev=7.2.3-1+cuda11.1 \
-    libnvinfer-plugin-dev=7.2.3-1+cuda11.1
+    libnvinfer${LIBNVINFER_MAJOR_VERSION}=${LIBNVINFER}+cuda${LIBNVINFER_CUDA} \
+    libnvinfer-dev=${LIBNVINFER}+cuda${LIBNVINFER_CUDA} \
+    libnvinfer-plugin${LIBNVINFER_MAJOR_VERSION}=${LIBNVINFER}+cuda${LIBNVINFER_CUDA}
+    libnvinfer-plugin-dev=${LIBNVINFER}+cuda${LIBNVINFER_CUDA}
 
 ENV PATH /usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
 ENV LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/cuda/extras/CUPTI/lib64:/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/cuda/lib64
-RUN ln -s cuda-11.2 /usr/local/cuda \
+RUN ln -s cuda-${CUDA} /usr/local/cuda \
     && ln -s /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1 \
     && echo "/usr/local/cuda/lib64/stubs" > /etc/ld.so.conf.d/z-cuda-stubs.conf \
     && ldconfig
@@ -178,6 +222,7 @@ FROM tensorflow-build-base AS tensorflow-build
 
 WORKDIR /tensorflow
 ARG BAZEL_OPTS
+ARG CC_OPT_FLAGS
 RUN mkdir -p /usr/share/man/man1 # bug for openjdk on slim variants / man directories missing
 RUN apt-get update && apt-get -y install --no-install-recommends \
     build-essential \
@@ -199,6 +244,10 @@ RUN python3 -m venv /venv \
 
 # SET UP BASE GOLANG IMAGE
 FROM golang:1.16-buster AS golang-tf-base
+ARG TF_GIT_TAG 
+ARG TF_GO_VERS
+ENV TF_GIT_TAG=${TF_GIT_TAG}
+ENV TF_GO_VERS=${TF_GO_VERS}
 
 # install protoc binary and libs
 COPY --from=protobuf-build /protobuf.tar.gz /opt/protobuf.tar.gz
@@ -212,7 +261,10 @@ RUN tar xz -C /usr/local -f /opt/libtensorflow.tar.gz && rm /opt/libtensorflow.t
 RUN ldconfig
 
 # copy tensorflow source
-COPY --from=tensorflow-build-base /tensorflow ${GOPATH}/src/github.com/tensorflow/tensorflow
+COPY --from=tensorflow-source /tensorflow ${GOPATH}/src/github.com/tensorflow/tensorflow
+
+# add bashrc
+COPY bashrc /root/.bashrc
 
 # source cuda package repos
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -225,12 +277,12 @@ RUN curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu18
 
 # install tf dependencies
 # note: bash needed for string substitution
-# note: libnvinfer uses cuda11.1 versions
 SHELL ["/bin/bash", "-c"]
 ARG CUDA
 ARG CUDNN
 ARG CUDNN_MAJOR_VERSION
 ARG LIBNVINFER
+ARG LIBNVINFER_CUDA=${LIBNVINFER_CUDA:-${CUDA}}
 ARG LIBNVINFER_MAJOR_VERSION
 RUN apt-get update && apt-get install -y --no-install-recommends \
     cuda-cudart-${CUDA/./-} \
@@ -243,11 +295,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libcurand-${CUDA/./-} \
     libcusolver-${CUDA/./-} \
     libcusparse-${CUDA/./-} \
-    libnvinfer${LIBNVINFER_MAJOR_VERSION}=${LIBNVINFER}+cuda11.1 \
-    libnvinfer-plugin${LIBNVINFER_MAJOR_VERSION}=${LIBNVINFER}+cuda11.1
+    libnvinfer${LIBNVINFER_MAJOR_VERSION}=${LIBNVINFER}+cuda${LIBNVINFER_CUDA} \
+    libnvinfer-plugin${LIBNVINFER_MAJOR_VERSION}=${LIBNVINFER}+cuda${LIBNVINFER_CUDA}
 
 ENV LD_LIBRARY_PATH /usr/local/cuda/extras/CUPTI/lib64:/usr/local/cuda/lib64:$LD_LIBRARY_PATH
-RUN ln -s cuda-11.2 /usr/local/cuda \
+RUN ln -s cuda-${CUDA} /usr/local/cuda \
     && ln -s /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1 \
     && echo "/usr/local/cuda/lib64/stubs" > /etc/ld.so.conf.d/z-cuda-stubs.conf \
     && ldconfig
@@ -256,8 +308,10 @@ RUN ln -s cuda-11.2 /usr/local/cuda \
 
 # INSTALL AND TEST TENSORFLOW/GO PACKAGE
 FROM golang-tf-base as golang-tf
+LABEL org.opencontainers.image.authors="William Muir <wamuir@gmail.com>"
+LABEL org.opencontainers.image.source="https://github.com/wamuir/golang-tf"
 
-# generate protocol buffers 
+# generate protocol buffers
 RUN cd ${GOPATH}/src/github.com/tensorflow/tensorflow \
     && go mod init \
     && go generate github.com/tensorflow/tensorflow/tensorflow/go/op \
@@ -267,5 +321,14 @@ RUN cd ${GOPATH}/src/github.com/tensorflow/tensorflow \
 RUN cd ${GOPATH}/src/github.com/tensorflow/tensorflow \
     && go test github.com/tensorflow/tensorflow/tensorflow/go \
     && go test github.com/tensorflow/tensorflow/tensorflow/go/op
+
+# add example app
+COPY example-usage /example-app
+ARG TF_GO_VERS
+RUN cd /example-app \
+    && go mod init example-app \
+    && go mod edit -require github.com/tensorflow/tensorflow@${TF_GO_VERS} \
+    && go mod edit -replace github.com/tensorflow/tensorflow=${GOPATH}/src/github.com/tensorflow/tensorflow \
+    && go mod tidy
 
 WORKDIR ${GOPATH}

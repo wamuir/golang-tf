@@ -1,10 +1,40 @@
-ARG BAZEL OPS="--config=release_cpu_linux"
+# MIT License
+#
+# Copyright (c) 2020 William Muir
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+# 
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+# ============================================================================
+#
+# THIS IS A GENERATED DOCKERFILE.
+#
+# This file was assembled from multiple pieces, whose use is documented
+# throughout. Refer to github.com/wamuir/golang-tf for further information.
+
 ARG USE_BAZEL_VERS="3.1.0"
 ARG PROTOBUF_VERS="3.14.0"
 ARG TENSORFLOW_VERS="2.4.1"
 ARG TENSORFLOW_VERS_SUFFIX=""
 ARG TF_GIT_TAG=${TENSORFLOW_VERS:+v${TENSORFLOW_VERS}${TENSORFLOW_VERS_SUFFIX}}
 ARG TF_GO_VERS=${TENSORFLOW_VERS:+v${TENSORFLOW_VERS}+incompatible}
+
+ARG BAZEL_OPTS="--config=release_cpu_linux"
+ARG CC_OPT_FLAGS=""
 
 
 
@@ -20,7 +50,7 @@ RUN apt-get update && apt-get -y install --no-install-recommends \
     ca-certificates \
     git \
     libtool
-RUN git clone --recurse-submodules https://github.com/protocolbuffers/protobuf.git . \
+RUN git clone --branch=v${PROTOBUF_VERS} --depth=1 --recurse-submodules https://github.com/protocolbuffers/protobuf.git . \
     && ./autogen.sh \
     && ./configure \
     && cd src \
@@ -58,6 +88,44 @@ RUN python3 -m venv /venv \
 
 
 
+# GET TENSORFLOW SOURCE
+FROM debian:buster-slim AS tensorflow-source
+
+WORKDIR /tensorflow
+ARG TF_GIT_TAG
+RUN apt-get update && apt-get -y install --no-install-recommends \
+    ca-certificates \
+    git
+RUN git clone --branch=${TF_GIT_TAG:-master} --depth=1 https://github.com/tensorflow/tensorflow.git .
+
+# apply patch to write generated source code to tensorflow source / don't vendor (#48872)
+COPY patches/0001-simplify-generation-of-go-protos.patch .
+RUN git apply 0001-simplify-generation-of-go-protos.patch
+
+
+
+# BUILD DEVTOOLSET
+FROM debian:buster-slim AS devtoolset-build
+
+COPY --from=tensorflow-source /tensorflow/tensorflow/tools/ci_build/devtoolset/build_devtoolset.sh /
+COPY --from=tensorflow-source /tensorflow/tensorflow/tools/ci_build/devtoolset/fixlinks.sh /
+COPY --from=tensorflow-source /tensorflow/tensorflow/tools/ci_build/devtoolset/platlib.patch /
+COPY --from=tensorflow-source /tensorflow/tensorflow/tools/ci_build/devtoolset/rpm-patch.sh /
+
+WORKDIR /
+RUN apt-get update && apt-get -y install --no-install-recommends \
+    build-essential \
+    cpio \
+    file \
+    flex \
+    rpm2cpio \
+    unar \
+    wget
+RUN /build_devtoolset.sh devtoolset-7 /dt7 \
+    && /build_devtoolset.sh devtoolset-8 /dt8
+
+
+
 # SET UP BASE TENSORFLOW BUILD IMAGE
 FROM debian:buster-slim AS tensorflow-build-base
 
@@ -71,17 +139,12 @@ COPY --from=bazel-build /usr/local/bin/bazel /usr/local/bin/bazel
 # link shared libraries
 RUN ldconfig
 
-# fetch tensorflow source
-WORKDIR /tensorflow
-ARG TF_GIT_TAG
-RUN apt-get update && apt-get -y install --no-install-recommends \
-    ca-certificates \
-    git
-RUN git clone --branch=${TF_GIT_TAG:-master} --depth=1 https://github.com/tensorflow/tensorflow.git .
+# copy devtoolset
+COPY --from=devtoolset-build /dt7 /dt7
+COPY --from=devtoolset-build /dt8 /dt8
 
-# apply patch to write generated source code to tensorflow source / don't vendor (#48872)
-COPY 0001-simplify-generation-of-go-protos.patch .
-RUN git apply 0001-simplify-generation-of-go-protos.patch
+# copy tensorflow source
+COPY --from=tensorflow-source /tensorflow /tensorflow
 
 
 
@@ -90,6 +153,7 @@ FROM tensorflow-build-base AS tensorflow-build
 
 WORKDIR /tensorflow
 ARG BAZEL_OPTS
+ARG CC_OPT_FLAGS
 RUN mkdir -p /usr/share/man/man1 # bug for openjdk on slim variants / man directories missing
 RUN apt-get update && apt-get -y install --no-install-recommends \
     build-essential \
@@ -111,6 +175,10 @@ RUN python3 -m venv /venv \
 
 # SET UP BASE GOLANG IMAGE
 FROM golang:1.16-buster AS golang-tf-base
+ARG TF_GIT_TAG 
+ARG TF_GO_VERS
+ENV TF_GIT_TAG=${TF_GIT_TAG}
+ENV TF_GO_VERS=${TF_GO_VERS}
 
 # install protoc binary and libs
 COPY --from=protobuf-build /protobuf.tar.gz /opt/protobuf.tar.gz
@@ -124,14 +192,19 @@ RUN tar xz -C /usr/local -f /opt/libtensorflow.tar.gz && rm /opt/libtensorflow.t
 RUN ldconfig
 
 # copy tensorflow source
-COPY --from=tensorflow-build-base /tensorflow ${GOPATH}/src/github.com/tensorflow/tensorflow
+COPY --from=tensorflow-source /tensorflow ${GOPATH}/src/github.com/tensorflow/tensorflow
+
+# add bashrc
+COPY bashrc /root/.bashrc
 
 
 
 # INSTALL AND TEST TENSORFLOW/GO PACKAGE
 FROM golang-tf-base as golang-tf
+LABEL org.opencontainers.image.authors="William Muir <wamuir@gmail.com>"
+LABEL org.opencontainers.image.source="https://github.com/wamuir/golang-tf"
 
-# generate protocol buffers 
+# generate protocol buffers
 RUN cd ${GOPATH}/src/github.com/tensorflow/tensorflow \
     && go mod init \
     && go generate github.com/tensorflow/tensorflow/tensorflow/go/op \
@@ -141,5 +214,14 @@ RUN cd ${GOPATH}/src/github.com/tensorflow/tensorflow \
 RUN cd ${GOPATH}/src/github.com/tensorflow/tensorflow \
     && go test github.com/tensorflow/tensorflow/tensorflow/go \
     && go test github.com/tensorflow/tensorflow/tensorflow/go/op
+
+# add example app
+COPY example-usage /example-app
+ARG TF_GO_VERS
+RUN cd /example-app \
+    && go mod init example-app \
+    && go mod edit -require github.com/tensorflow/tensorflow@${TF_GO_VERS} \
+    && go mod edit -replace github.com/tensorflow/tensorflow=${GOPATH}/src/github.com/tensorflow/tensorflow \
+    && go mod tidy
 
 WORKDIR ${GOPATH}
