@@ -1,0 +1,129 @@
+header: |
+    # MIT License
+    #
+    # Copyright (c) 2020 William Muir
+    #
+    # Permission is hereby granted, free of charge, to any person obtaining a copy
+    # of this software and associated documentation files (the "Software"), to deal
+    # in the Software without restriction, including without limitation the rights
+    # to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    # copies of the Software, and to permit persons to whom the Software is
+    # furnished to do so, subject to the following conditions:
+    # 
+    # The above copyright notice and this permission notice shall be included in all
+    # copies or substantial portions of the Software.
+    # 
+    # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    # IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    # FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    # AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    # SOFTWARE.
+    # ============================================================================
+    #
+    # THIS IS A GENERATED DOCKERFILE.
+    #
+    # This file was assembled from multiple pieces, whose use is documented
+    # throughout. Refer to github.com/wamuir/golang-tf for further information.
+
+releases:
+    versioned:
+        tag_specs:
+            - "{test}{golang-tf}"
+    dockerfiles:
+        is_dockerfiles: true
+        upload_images: false
+        tag_specs:
+            - "{variants}{golang-tf}"
+
+slice_sets:
+    test:
+        - add_to_name: "2.4.1"
+          dockerfile_exclusive_name: "tensorflow-2.4.1/cpu"
+          partials:
+              - args/2.4.1
+              - args/2.4.1-cpu
+              - protobuf-build
+              - bazel-build
+              - tensorflow-source
+              - patches/tensorflow-2.4.1
+              - devtoolset-build
+              - tensorflow-build-base
+              - tensorflow-build
+              - golang-tf-base
+    variants:
+        - add_to_name: "1.15.5"
+          dockerfile_exclusive_name: "tensorflow-1.15.5/cpu"
+          partials:
+              - args/1.15.5
+              - args/1.15.5-cpu
+              - protobuf-build
+              - bazel-build
+              - tensorflow-source
+              - patches/tensorflow-1.15.5
+              - devtoolset-build
+              - tensorflow-build-base
+              - tensorflow-build
+              - golang-tf-base
+        - add_to_name: "2.4.1"
+          dockerfile_exclusive_name: "tensorflow-2.4.1/cpu"
+          partials:
+              - args/2.4.1
+              - args/2.4.1-cpu
+              - protobuf-build
+              - bazel-build
+              - tensorflow-source
+              - patches/tensorflow-2.4.1
+              - devtoolset-build
+              - tensorflow-build-base
+              - tensorflow-build
+              - golang-tf-base
+        - add_to_name: "2.4.1-gpu"
+          dockerfile_exclusive_name: "tensorflow-2.4.1/gpu"
+          partials:
+              - args/2.4.1
+              - args/2.4.1-gpu
+              - protobuf-build
+              - bazel-build
+              - tensorflow-source
+              - patches/tensorflow-2.4.1
+              - devtoolset-build
+              - tensorflow-build-base
+              - tensorflow-build-base-cuda
+              - tensorflow-build
+              - golang-tf-base
+              - golang-tf-base-cuda
+        - add_to_name: "2.5.0"
+          dockerfile_exclusive_name: "tensorflow-2.5.0/cpu"
+          partials:
+              - args/2.5.0
+              - args/2.5.0-cpu
+              - protobuf-build
+              - bazel-build
+              - tensorflow-source
+              - patches/tensorflow-2.5.0
+              - devtoolset-build
+              - tensorflow-build-base
+              - tensorflow-build
+              - golang-tf-base
+        - add_to_name: "2.5.0-gpu"
+          dockerfile_exclusive_name: "tensorflow-2.5.0/gpu"
+          partials:
+              - args/2.5.0
+              - args/2.5.0-gpu
+              - protobuf-build
+              - bazel-build
+              - tensorflow-source
+              - patches/tensorflow-2.5.0
+              - devtoolset-build
+              - tensorflow-build-base
+              - tensorflow-build-base-cuda
+              - tensorflow-build
+              - golang-tf-base
+              - golang-tf-base-cuda
+
+    golang-tf:
+        - add_to_name: ""
+          partials:
+              - golang-tf
