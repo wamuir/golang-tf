@@ -31,7 +31,7 @@ releases:
 
     versioned:
         tag_specs:
-            - "{test}{golang-tf}"
+            - "{variants}{golang-tf}"
 
     dockerfiles:
         is_dockerfiles: true
@@ -47,21 +47,6 @@ slice_sets:
               - golang-tf
           tests:
               - run.sh
-
-    test:
-        - add_to_name: "2.4.1"
-          dockerfile_exclusive_name: "tensorflow-2.4.1/cpu"
-          partials:
-              - args/2.4.1
-              - args/2.4.1-cpu
-              - protobuf-build
-              - bazel-build
-              - tensorflow-source
-              - patches/tensorflow-2.4.1
-              - devtoolset-build
-              - tensorflow-build-base
-              - tensorflow-build
-              - golang-tf-base
 
     variants:
         - add_to_name: "1.15.5"
