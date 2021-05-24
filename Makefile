@@ -13,6 +13,7 @@ build: construct
 		--hub_repository=wamuir/golang-tf \
 		--repository=wamuir/golang-tf \
 		--release=versioned \
+		--run_tests_path=$(realpath ./assembler/tests) \
 		--stop_on_failure
 
 construct:

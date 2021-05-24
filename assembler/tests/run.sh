@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 
 set -ex
-go run /example-app
+cd /example-app && go run tf.go
