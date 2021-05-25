@@ -164,14 +164,15 @@ COPY --from=devtoolset-build /dt8 /dt8
 # copy tensorflow source
 COPY --from=tensorflow-source /tensorflow /tensorflow
 
+ARG CUDNN_MAJOR_VERSION
 ARG TF_CUDA_VERSION
 ARG TF_CUDNN_VERSION
 ARG TF_TENSORRT_VERSION
-ARG TF_COMPUTE_CAPABILITIES
+ARG TF_CUDA_COMPUTE_CAPABILITIES
 
 ENV TF_NEED_CUDA=TRUE
 ENV TF_CUDA_VERSION=${TF_CUDA_VERSION}
-ENV TF_CUDNN_VERSION=${TF_CUDNN_VERSION}
+ENV TF_CUDNN_VERSION=${CUDNN_MAJOR_VERSION}
 ENV TF_NEED_TENSORRT=TRUE
 ENV TF_TENSORRT_VERSION=${TF_TENSORRT_VERSION}
 ENV TF_CUDA_COMPUTE_CAPABILITIES=${TF_CUDA_COMPUTE_CAPABILITIES}
@@ -192,7 +193,7 @@ ARG CUDA
 ARG CUDNN
 ARG CUDNN_MAJOR_VERSION
 ARG LIBNVINFER
-ARG LIBNVINFER_CUDA=${LIBNVINFER_CUDA:-${CUDA}}
+ARG LIBNVINFER_CUDA
 ARG LIBNVINFER_MAJOR_VERSION
 RUN apt-get update && apt-get -y install --no-install-recommends \
     cuda-command-line-tools-${CUDA/./-} \
@@ -203,10 +204,10 @@ RUN apt-get update && apt-get -y install --no-install-recommends \
     cuda-nvprune-${CUDA/./-} \
     libcudnn${CUDNN_MAJOR_VERSION}=${CUDNN}+cuda${CUDA} \
     libcudnn${CUDNN_MAJOR_VERSION}-dev=${CUDNN}+cuda${CUDA} \
-    libnvinfer${LIBNVINFER_MAJOR_VERSION}=${LIBNVINFER}+cuda${LIBNVINFER_CUDA} \
-    libnvinfer-dev=${LIBNVINFER}+cuda${LIBNVINFER_CUDA} \
-    libnvinfer-plugin${LIBNVINFER_MAJOR_VERSION}=${LIBNVINFER}+cuda${LIBNVINFER_CUDA}
-    libnvinfer-plugin-dev=${LIBNVINFER}+cuda${LIBNVINFER_CUDA}
+    libnvinfer${LIBNVINFER_MAJOR_VERSION}=${LIBNVINFER}+cuda${LIBNVINFER_CUDA:-${CUDA}} \
+    libnvinfer-dev=${LIBNVINFER}+cuda${LIBNVINFER_CUDA:-${CUDA}} \
+    libnvinfer-plugin${LIBNVINFER_MAJOR_VERSION}=${LIBNVINFER}+cuda${LIBNVINFER_CUDA:-${CUDA}} \
+    libnvinfer-plugin-dev=${LIBNVINFER}+cuda${LIBNVINFER_CUDA:-${CUDA}}
 
 ENV PATH /usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
 ENV LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/cuda/extras/CUPTI/lib64:/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/cuda/lib64
