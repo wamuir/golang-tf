@@ -1,0 +1,53 @@
+From f4c76370471fa11f34f1f493d0b88e5426bedc4c Mon Sep 17 00:00:00 2001
+From: William Muir <wamuir@gmail.com>
+Date: Tue, 25 May 2021 11:14:14 +0000
+Subject: [PATCH 1/1] fix proto package name
+
+---
+ tensorflow/go/saved_model.go    | 2 +-
+ tensorflow/go/signature.go      | 2 +-
+ tensorflow/go/signature_test.go | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/tensorflow/go/saved_model.go b/tensorflow/go/saved_model.go
+index 64ae82e3b01..7aa1e83cbc4 100644
+--- a/tensorflow/go/saved_model.go
++++ b/tensorflow/go/saved_model.go
+@@ -22,7 +22,7 @@ import (
+ 	"unsafe"
+ 
+ 	"github.com/golang/protobuf/proto"
+-	corepb "github.com/tensorflow/tensorflow/tensorflow/go/core/protobuf/for_core_protos_go_proto"
++	corepb "github.com/tensorflow/tensorflow/tensorflow/go/core/core_protos_go_proto"
+ )
+ 
+ // #include <stdlib.h>
+diff --git a/tensorflow/go/signature.go b/tensorflow/go/signature.go
+index c2db0c75247..8aac0e2ec93 100644
+--- a/tensorflow/go/signature.go
++++ b/tensorflow/go/signature.go
+@@ -16,7 +16,7 @@ limitations under the License.
+ 
+ package tensorflow
+ 
+-import corepb "github.com/tensorflow/tensorflow/tensorflow/go/core/protobuf/for_core_protos_go_proto"
++import corepb "github.com/tensorflow/tensorflow/tensorflow/go/core/core_protos_go_proto"
+ 
+ // #include "tensorflow/c/c_api.h"
+ import "C"
+diff --git a/tensorflow/go/signature_test.go b/tensorflow/go/signature_test.go
+index f9fa8427819..54e5fe42a8d 100644
+--- a/tensorflow/go/signature_test.go
++++ b/tensorflow/go/signature_test.go
+@@ -22,7 +22,7 @@ import (
+ 
+ 	tspb "github.com/tensorflow/tensorflow/tensorflow/go/core/framework/tensor_shape_go_proto"
+ 	typb "github.com/tensorflow/tensorflow/tensorflow/go/core/framework/types_go_proto"
+-	corepb "github.com/tensorflow/tensorflow/tensorflow/go/core/protobuf/for_core_protos_go_proto"
++	corepb "github.com/tensorflow/tensorflow/tensorflow/go/core/core_protos_go_proto"
+ )
+ 
+ func TestSignatureFromProto(t *testing.T) {
+-- 
+2.25.1
+
