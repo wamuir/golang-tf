@@ -278,7 +278,7 @@ ARG CUDA
 ARG CUDNN
 ARG CUDNN_MAJOR_VERSION
 ARG LIBNVINFER
-ARG LIBNVINFER_CUDA=${LIBNVINFER_CUDA:-${CUDA}}
+ARG LIBNVINFER_CUDA
 ARG LIBNVINFER_MAJOR_VERSION
 RUN apt-get update && apt-get install -y --no-install-recommends \
     cuda-cudart-${CUDA/./-} \
@@ -291,8 +291,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libcurand-${CUDA/./-} \
     libcusolver-${CUDA/./-} \
     libcusparse-${CUDA/./-} \
-    libnvinfer${LIBNVINFER_MAJOR_VERSION}=${LIBNVINFER}+cuda${LIBNVINFER_CUDA} \
-    libnvinfer-plugin${LIBNVINFER_MAJOR_VERSION}=${LIBNVINFER}+cuda${LIBNVINFER_CUDA}
+    libnvinfer${LIBNVINFER_MAJOR_VERSION}=${LIBNVINFER}+cuda${LIBNVINFER_CUDA:-${CUDA}} \
+    libnvinfer-plugin${LIBNVINFER_MAJOR_VERSION}=${LIBNVINFER}+cuda${LIBNVINFER_CUDA:-${CUDA}}
 
 ENV LD_LIBRARY_PATH /usr/local/cuda/extras/CUPTI/lib64:/usr/local/cuda/lib64:$LD_LIBRARY_PATH
 RUN ln -s cuda-${CUDA} /usr/local/cuda \
