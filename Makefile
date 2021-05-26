@@ -1,10 +1,19 @@
 PYTHON = python3
 
-.PHONY = build construct
+.PHONY = assemble build buildx
 
-.DEFAULT_GOAL = construct
+.DEFAULT_GOAL = assemble
 
-build: construct
+assemble:
+	${PYTHON} assembler/assembler.py \
+		--construct_dockerfiles \
+		--release=dockerfiles \
+		--spec_file=assembler/spec.yml \
+		--partial_dir=assembler/partials \
+		--dockerfile_dir=build
+	(cd build && tar c tensorflow-*) | ( tar xf -)
+
+build: assemble
 	${PYTHON} assembler/assembler.py \
 		--spec_file=assembler/spec.yml \
 		--partial_dir=assembler/partials \
@@ -16,12 +25,5 @@ build: construct
 		--run_tests_path=$(realpath ./assembler/tests) \
 		--stop_on_failure
 
-construct:
-	${PYTHON} assembler/assembler.py \
-		--construct_dockerfiles \
-		--release=dockerfiles \
-		--spec_file=assembler/spec.yml \
-		--partial_dir=assembler/partials \
-		--dockerfile_dir=build
-	(cd build && tar c tensorflow-*) | ( tar xf -)
-
+buildx: assemble
+	# todo
