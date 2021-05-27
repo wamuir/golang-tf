@@ -33,8 +33,9 @@ ARG TENSORFLOW_VERS_SUFFIX=""
 ARG TF_GIT_TAG=${TENSORFLOW_VERS:+v${TENSORFLOW_VERS}${TENSORFLOW_VERS_SUFFIX}}
 ARG TF_GO_VERS=${TENSORFLOW_VERS:+v${TENSORFLOW_VERS}+incompatible}
 
-ARG BAZEL_OPTS="--config=release_gpu_linux"
-ARG CC_OPT_FLAGS=""
+ARG TARGETARCH=${TARGETARCH:-amd64}
+ARG BAZEL_OPTS_AMD64="--config=release_gpu_linux"
+ARG CC_OPT_FLAGS_AMD64=""
 
 ARG CUDA=11.2
 ARG CUDA_VERSION 11.2.2
@@ -122,9 +123,15 @@ RUN git apply 0001-simplify-generation-of-go-protos.patch
 
 
 
-# BUILD DEVTOOLSET
-FROM debian:buster-slim AS devtoolset-build
+# SET UP BASE TENSORFLOW BUILD IMAGE FOR AMD64
+FROM debian:buster-slim AS tensorflow-build-base-amd64
 
+ARG BAZEL_OPTS_AMD64
+ARG CC_OPT_FLAGS_AMD64
+ENV BAZEL_OPTS=${BAZEL_OPTS_AMD64}
+ENV CC_OPT_FLAGS=${CC_OPT_FLAGS_AMD64}
+
+# BUILD DEVTOOLSET
 COPY --from=tensorflow-source /tensorflow/tensorflow/tools/ci_build/devtoolset/build_devtoolset.sh /
 COPY --from=tensorflow-source /tensorflow/tensorflow/tools/ci_build/devtoolset/fixlinks.sh /
 COPY --from=tensorflow-source /tensorflow/tensorflow/tools/ci_build/devtoolset/platlib.patch /
@@ -144,8 +151,18 @@ RUN /build_devtoolset.sh devtoolset-7 /dt7 \
 
 
 
+# SET UP BASE TENSORFLOW BUILD IMAGE FOR ARM64
+FROM debian:buster-slim AS tensorflow-build-base-arm64
+
+ARG BAZEL_OPTS_ARM64
+ARG CC_OPT_FLAGS_AMD64
+ENV BAZEL_OPTS=${BAZEL_OPTS_ARM64}
+ENV CC_OPT_FLAGS=${CC_OPT_FLAGS_ARM64}
+
+
+
 # SET UP BASE TENSORFLOW BUILD IMAGE
-FROM debian:buster-slim AS tensorflow-build-base
+FROM tensorflow-build-base-$TARGETARCH AS tensorflow-build-base
 
 # install protoc binary and libs
 COPY --from=protobuf-build /protobuf.tar.gz /opt/protobuf.tar.gz
@@ -156,10 +173,6 @@ COPY --from=bazel-build /usr/local/bin/bazel /usr/local/bin/bazel
 
 # link shared libraries
 RUN ldconfig
-
-# copy devtoolset
-COPY --from=devtoolset-build /dt7 /dt7
-COPY --from=devtoolset-build /dt8 /dt8
 
 # copy tensorflow source
 COPY --from=tensorflow-source /tensorflow /tensorflow
@@ -222,8 +235,6 @@ RUN ln -s cuda-${CUDA} /usr/local/cuda \
 FROM tensorflow-build-base AS tensorflow-build
 
 WORKDIR /tensorflow
-ARG BAZEL_OPTS
-ARG CC_OPT_FLAGS
 RUN mkdir -p /usr/share/man/man1 # bug for openjdk on slim variants / man directories missing
 RUN apt-get update && apt-get -y install --no-install-recommends \
     build-essential \

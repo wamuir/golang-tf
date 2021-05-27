@@ -4,8 +4,6 @@
 FROM tensorflow-build-base AS tensorflow-build
 
 WORKDIR /tensorflow
-ARG BAZEL_OPTS
-ARG CC_OPT_FLAGS
 RUN mkdir -p /usr/share/man/man1 # bug for openjdk on slim variants / man directories missing
 RUN apt-get update && apt-get -y install --no-install-recommends \
     build-essential \
