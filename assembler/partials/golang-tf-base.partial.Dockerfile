@@ -9,19 +9,10 @@ ENV TENSORFLOW_VERS=${TENSORFLOW_VERS}
 ENV TENSORFLOW_VERS_SUFFIX=${TENSORFLOW_VERS_SUFFIX}
 ENV TF_GO_VERS=${TF_GO_VERS}
 
-# install protoc binary and libs
-COPY --from=protobuf-build /protobuf.tar.gz /opt/protobuf.tar.gz
-RUN tar xz -C /usr/local -f /opt/protobuf.tar.gz && rm /opt/protobuf.tar.gz
-
 # install c lib for tensorflow
-COPY --from=tensorflow-build /libtensorflow.tar.gz /opt/libtensorflow.tar.gz
-RUN tar xz -C /usr/local -f /opt/libtensorflow.tar.gz && rm /opt/libtensorflow.tar.gz
-
-# link shared libs
-RUN ldconfig
-
-# copy tensorflow source
-COPY --from=tensorflow-source /tensorflow ${GOPATH}/src/github.com/tensorflow/tensorflow
+RUN --mount=from=tensorflow-build,dst=/mnt \
+    tar xz -C /usr/local -f /mnt/libtensorflow.tar.gz \
+    && ldconfig
 
 # add bashrc
-COPY bashrc /root/.bashrc
+COPY bashrc /etc/profile.d/bashrc
