@@ -26,5 +26,4 @@ build: assemble
 		--stop_on_failure
 
 buildx: assemble
-	TF_VERSION=2.4.1 GPU=false docker buildx bake
-	# todo
+	DOCKER_BUILDKIT=1 TF_VERSION=2.4.1 GPU=false docker buildx bake
