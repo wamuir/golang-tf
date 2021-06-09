@@ -1,5 +1,6 @@
-ARG BAZEL_OPTS="--config=release_gpu_linux --action_env=TENSORRT_INSTALL_PATH=/usr"
-ARG CC_OPT_FLAGS=""
+ARG TARGETARCH=${TARGETARCH:-amd64}
+ARG BAZEL_OPTS_AMD64="--config=release_gpu_linux"
+ARG CC_OPT_FLAGS_AMD64=""
 
 ARG CUDA=11.0
 ARG CUDA_VERSION 11.0.3
