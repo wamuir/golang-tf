@@ -48,17 +48,3 @@ printf "  * Golang Version:     %s\n" "$GOLANG_VERSION"
 printf "  * TensorFlow Version: %s%s\n" "$TENSORFLOW_VERS" "$TENSORFLOW_VERS_SUFFIX"
 printf "\n"
 echo -e "\e[m"
-
-
-
-echo -e "\e[0;33m"
-printf "  NOTE: TensorFlow bindings for Go are not compatible with \`go get\`.\n"
-printf "\n"
-printf "  Instead, use the Go Module -replace directive within your application::\n"
-printf "  -------------------------------------------------------------------------------\n"
-printf "  $ go mod edit -require github.com/tensorflow/tensorflow@%s\n" "${TF_GO_VERS}"
-printf "  $ go mod edit -replace github.com/tensorflow/tensorflow=%s/src/github.com/tensorflow/tensorflow\n" "$(go env GOPATH)"
-printf "\n"
-printf "  A working example is located at /example-app. Try: \`cd /example-app && go run tf.go\`\n"
-printf "\n"
-echo -e "\e[m"
