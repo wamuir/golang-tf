@@ -14,7 +14,7 @@ assemble:
 	(cd build && tar c tensorflow-*) | ( tar xf -)
 
 build: assemble
-	${PYTHON} assembler/assembler.py \
+	DOCKER_BUILDKIT=1 ${PYTHON} assembler/assembler.py \
 		--spec_file=assembler/spec.yml \
 		--partial_dir=assembler/partials \
 		--dockerfile_dir=build \
@@ -26,4 +26,4 @@ build: assemble
 		--stop_on_failure
 
 buildx: assemble
-	# todo
+	DOCKER_BUILDKIT=1 TF_VERSION=2.4.1 GPU=false docker buildx bake
