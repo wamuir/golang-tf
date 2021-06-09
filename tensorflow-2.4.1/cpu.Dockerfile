@@ -201,7 +201,7 @@ RUN --mount=from=tensorflow-build,dst=/mnt \
     && ldconfig
 
 # add bashrc
-COPY bashrc /etc/profile.d/bashrc
+COPY bashrc /etc/bash.bashrc
 
 
 
