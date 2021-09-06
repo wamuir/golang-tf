@@ -1,7 +1,7 @@
 
 
 # SET UP BASE GOLANG IMAGE
-FROM golang:1.16-buster AS golang-tf-base
+FROM golang:${GOLANG_VERS}-buster AS golang-tf-base
 ARG TENSORFLOW_VERS
 ARG TENSORFLOW_VERS_SUFFIX
 ARG TF_GO_VERS
