@@ -26,6 +26,7 @@
 # This file was assembled from multiple pieces, whose use is documented
 # throughout. Refer to github.com/wamuir/golang-tf for further information.
 
+ARG GOLANG_VERS="1.16"
 ARG USE_BAZEL_VERS="0.26.1"
 ARG PROTOBUF_VERS="3.14.0"
 ARG TENSORFLOW_VERS="1.15.5"
@@ -237,10 +238,6 @@ RUN cp ../tensorflow/ACKNOWLEDGMENTS ../tensorflow/LICENSE ../tensorflow/go.mod 
     && mkdir -p tensorflow && cd tensorflow && cp -r ${GOPATH}/src/github.com/tensorflow/tensorflow/tensorflow/go . \
     && mkdir -p cc/saved_model/testdata && cd cc/saved_model/testdata && cp -r ${GOPATH}/src/github.com/tensorflow/tensorflow/tensorflow/cc/saved_model/testdata/half_plus_two .
 
-# symbolic link for compat with legacy `go mod -replace` instructions
-RUN rm -rf ${GOPATH}/src/github.com/tensorflow/tensorflow \
-    && ln -s tensorflow@${TF_GO_VERS} ${GOPATH}/src/github.com/tensorflow/tensorflow
-
 # create files for proxy
 WORKDIR ${GOPATH}/src/cache/github.com/tensorflow/tensorflow/@v
 RUN echo "${TF_GO_VERS}" > list \
@@ -252,6 +249,9 @@ RUN cd ${GOPATH}/src && zip -r -9 \
     cache/github.com/tensorflow/tensorflow/@v/${TF_GO_VERS}.zip \
     github.com/tensorflow/tensorflow@${TF_GO_VERS}
 
+# rename tf/go source for compat with legacy `go mod -replace` instructions
+RUN rm -rf ${GOPATH}/src/github.com/tensorflow/tensorflow \
+    && mv ${GOPATH}/src/github.com/tensorflow/tensorflow@${TF_GO_VERS} ${GOPATH}/src/github.com/tensorflow/tensorflow
 
 
 
