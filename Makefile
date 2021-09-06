@@ -26,4 +26,4 @@ build: assemble
 		--stop_on_failure
 
 buildx: assemble
-	TF_VERSION=2.5.0 GPU=true docker buildx bake --pull
+	TF_VERSION=2.6.0 GPU=false docker buildx bake --pull --load
