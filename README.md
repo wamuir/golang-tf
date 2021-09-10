@@ -14,7 +14,7 @@ docker pull wamuir/golang-tf
 Go modules (`go mod`) will work when using the image.  Use the `require` and `replace` flags as follows:
 
 ```sh
-go mod edit -require github.com/tensorflow/tensorflow@v2.5.0+incompatible
+go mod edit -require github.com/tensorflow/tensorflow@v2.6.0+incompatible
 go mod edit -replace github.com/tensorflow/tensorflow=/go/src/github.com/tensorflow/tensorflow
 ```
 
@@ -23,7 +23,7 @@ go mod edit -replace github.com/tensorflow/tensorflow=/go/src/github.com/tensorf
 Installation of the [NVIDIA Container Toolkit](https://github.com/NVIDIA/nvidia-docker) is necessary for GPU use.  Then, expose the GPU(s) to the docker container using the `--gpus all` flag.  Example:
 
 ```sh
-docker run -it --rm --gpus all wamuir/golang-tf:2.5.0-gpu
+docker run -it --rm --gpus all wamuir/golang-tf:2.6.0-gpu
 ```
 
 ## Background
