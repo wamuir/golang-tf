@@ -1,14 +1,10 @@
-FROM wamuir/golang-tf:2.5.0
+FROM wamuir/golang-tf
 
-WORKDIR /app
+# Build example program
+WORKDIR /example-program
+COPY hello_tf.go .
+RUN go mod init app \
+    && go mod tidy \
+    && go build
 
-COPY tf.go .
-
-RUN go mod init golang-tf-app \
-    && go mod edit -require github.com/tensorflow/tensorflow@v2.5.0+incompatible \
-    && go mod edit -replace github.com/tensorflow/tensorflow=/go/src/github.com/tensorflow/tensorflow \
-    && go mod tidy
-
-RUN go build
-
-ENTRYPOINT ["/app/golang-tf-app"]
+ENTRYPOINT ["/example-program/app"]
