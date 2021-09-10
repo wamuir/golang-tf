@@ -30,7 +30,8 @@ target "build-cpu" {
       "wamuir/golang-tf:${semver(TF_VERSION, 0)}",
       "wamuir/golang-tf:${semver(TF_VERSION, 0)}.${semver(TF_VERSION, 1)}"
     ] : [
-      "wamuir/golang-tf:${TF_VERSION}"
+      "wamuir/golang-tf:${TF_VERSION}",
+      "wamuir/golang-tf:${semver(TF_VERSION, 0)}.${semver(TF_VERSION, 1)}"
     ]
 }
 
@@ -45,6 +46,7 @@ target "build-gpu" {
       "wamuir/golang-tf:${semver(TF_VERSION, 0)}-gpu",
       "wamuir/golang-tf:${semver(TF_VERSION, 0)}.${semver(TF_VERSION, 1)}-gpu"
     ] : [
-      "wamuir/golang-tf:${TF_VERSION}-gpu"
+      "wamuir/golang-tf:${TF_VERSION}-gpu",
+      "wamuir/golang-tf:${semver(TF_VERSION, 0)}.${semver(TF_VERSION, 1)}-gpu"
     ]
 }
