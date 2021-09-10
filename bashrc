@@ -23,8 +23,8 @@
 # ==============================================================================
 
 
-if ! echo $(go env GOPROXY) | grep -q "^file://${GOPATH}/src/cache[,|$]"; then
-	GOPROXY="file://${GOPATH}/src/cache,$(go env GOPROXY)"
+if ! echo $(go env GOPROXY) | grep -q "^file://${GOPATH}/proxy[,|$]"; then
+	GOPROXY="file://${GOPATH}/proxy,$(go env GOPROXY)"
 	go env -w GOPROXY=${GOPROXY} &> /dev/null || export GOPROXY
 fi
 
