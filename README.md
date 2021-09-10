@@ -9,14 +9,10 @@ This repository contains Dockerfiles for using Tensorflow in Go.  You can build 
 docker pull wamuir/golang-tf
 ```
 
-## Usage with Go Modules
+## Example Usage
 
-Go modules (`go mod`) will work when using the image.  Use the `require` and `replace` flags as follows:
+See the [example Dockerfile](https://github.com/wamuir/golang-tf/blob/main/example-usage/Dockerfile).
 
-```sh
-go mod edit -require github.com/tensorflow/tensorflow@v2.6.0+incompatible
-go mod edit -replace github.com/tensorflow/tensorflow=/go/src/github.com/tensorflow/tensorflow
-```
 
 ## GPU Support
 
