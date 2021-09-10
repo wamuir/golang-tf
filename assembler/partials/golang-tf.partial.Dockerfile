@@ -5,7 +5,8 @@ FROM golang-tf-base as golang-tf
 LABEL org.opencontainers.image.authors="William Muir <wamuir@gmail.com>"
 LABEL org.opencontainers.image.source="https://github.com/wamuir/golang-tf"
 
-# copy source
+# copy proxy and source
+COPY --from=golang-tf-build ${GOPATH}/proxy ${GOPATH}/proxy
 COPY --from=golang-tf-build ${GOPATH}/src ${GOPATH}/src
 
 # use fileproxy

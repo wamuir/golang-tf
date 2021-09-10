@@ -36,7 +36,7 @@ RUN echo "${TF_GO_VERS}" > list \
 RUN apt-get update && apt-get -y install --no-install-recommends \
     zip
 RUN cd ${GOPATH}/src && zip -r -9 \
-    proxy/github.com/tensorflow/tensorflow/@v/${TF_GO_VERS}.zip \
+    ../proxy/github.com/tensorflow/tensorflow/@v/${TF_GO_VERS}.zip \
     github.com/tensorflow/tensorflow@${TF_GO_VERS}
 
 # rename tf/go source for compat with legacy `go mod -replace` instructions
