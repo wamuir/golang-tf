@@ -23,6 +23,16 @@
 # ==============================================================================
 
 
+if ! echo $(go env GOPROXY) | grep -q "^file://${GOPATH}/src/cache[,|$]"; then
+	GOPROXY="file://${GOPATH}/src/cache,$(go env GOPROXY)"
+	go env -w GOPROXY=${GOPROXY} &> /dev/null || export GOPROXY
+fi
+
+if ! echo $(go env GONOSUMDB) | grep -q "github.com/tensorflow/tensorflow[,|$]"; then
+	GONOSUMDB="github.com/tensorflow/tensorflow,$(go env GONOSUMDB)"
+	go env -w GONOSUMDB=${GONOSUMDB} &> /dev/null || export GONOSUMDB
+fi
+
 # return if not interactive
 [ -z "$PS1" ] && return
 

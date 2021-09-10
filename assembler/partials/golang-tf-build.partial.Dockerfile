@@ -29,14 +29,14 @@ RUN cp ../tensorflow/ACKNOWLEDGMENTS ../tensorflow/LICENSE ../tensorflow/go.mod 
     && mkdir -p cc/saved_model/testdata && cd cc/saved_model/testdata && cp -r ${GOPATH}/src/github.com/tensorflow/tensorflow/tensorflow/cc/saved_model/testdata/half_plus_two .
 
 # create files for proxy
-WORKDIR ${GOPATH}/src/cache/github.com/tensorflow/tensorflow/@v
+WORKDIR ${GOPATH}/proxy/github.com/tensorflow/tensorflow/@v
 RUN echo "${TF_GO_VERS}" > list \
     && cp ${GOPATH}/src/github.com/tensorflow/tensorflow@${TF_GO_VERS}/go.mod ${TF_GO_VERS}.mod \
     && echo "{\"Version\": \"${TF_GO_VERS}\",\"Time\":\"$(date -u +'%Y-%m-%dT%H:%M:%SZ')\"}" > ${TF_GO_VERS}.info
 RUN apt-get update && apt-get -y install --no-install-recommends \
     zip
 RUN cd ${GOPATH}/src && zip -r -9 \
-    cache/github.com/tensorflow/tensorflow/@v/${TF_GO_VERS}.zip \
+    proxy/github.com/tensorflow/tensorflow/@v/${TF_GO_VERS}.zip \
     github.com/tensorflow/tensorflow@${TF_GO_VERS}
 
 # rename tf/go source for compat with legacy `go mod -replace` instructions

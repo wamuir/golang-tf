@@ -10,7 +10,7 @@ COPY --from=golang-tf-build ${GOPATH}/src ${GOPATH}/src
 
 # use fileproxy
 RUN go env -w \
-    GOPROXY="file://${GOPATH}/src/cache,$(go env GOPROXY)" \
+    GOPROXY="file://${GOPATH}/proxy,$(go env GOPROXY)" \
     GONOSUMDB="github.com/tensorflow/tensorflow"
 
 WORKDIR ${GOPATH}
