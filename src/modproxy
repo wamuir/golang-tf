@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+TF_VERSION=$1
+
+docker run --rm wamuir/golang-tf:${TF_VERSION} \
+	tar -c --directory /go/proxy --exclude=list --to-stdout . | \
+tar -x --directory docs
+
+
+LIST=docs/github.com/tensorflow/tensorflow/@v/list
+echo "v${TF_VERSION}+incompatible" >> ${LIST}
+sort -o ${LIST} ${LIST}

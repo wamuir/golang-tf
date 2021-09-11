@@ -1,6 +1,6 @@
 PYTHON = python3
 
-.PHONY = assemble build buildx
+.PHONY = assemble build buildx proxy
 
 .DEFAULT_GOAL = assemble
 
@@ -26,3 +26,6 @@ build: assemble
 
 buildx: assemble
 	TF_VERSION=2.6.0 GPU=false docker buildx bake --pull --load
+
+proxy:
+	src/modproxy 2.6.0
