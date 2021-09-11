@@ -25,8 +25,8 @@ target "build-cpu" {
     "linux/arm64"
   ]
   tags = LATEST ? [
-      "wamuir/golang-tf:${TF_VERSION}",
       "wamuir/golang-tf:latest",
+      "wamuir/golang-tf:${TF_VERSION}",
       "wamuir/golang-tf:${semver(TF_VERSION, 0)}",
       "wamuir/golang-tf:${semver(TF_VERSION, 0)}.${semver(TF_VERSION, 1)}"
     ] : [
@@ -41,8 +41,9 @@ target "build-gpu" {
     "linux/amd64"
   ]
   tags = LATEST ? [
-      "wamuir/golang-tf:${TF_VERSION}-gpu",
+      "wamuir/golang-tf:gpu",
       "wamuir/golang-tf:latest-gpu",
+      "wamuir/golang-tf:${TF_VERSION}-gpu",
       "wamuir/golang-tf:${semver(TF_VERSION, 0)}-gpu",
       "wamuir/golang-tf:${semver(TF_VERSION, 0)}.${semver(TF_VERSION, 1)}-gpu"
     ] : [

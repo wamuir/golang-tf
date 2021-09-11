@@ -19,7 +19,7 @@ See the [example Dockerfile](https://github.com/wamuir/golang-tf/blob/main/examp
 Installation of the [NVIDIA Container Toolkit](https://github.com/NVIDIA/nvidia-docker) is necessary for GPU use.  Then, expose the GPU(s) to the docker container using the `--gpus all` flag.  Example:
 
 ```sh
-docker run -it --rm --gpus all wamuir/golang-tf:2.6.0-gpu
+docker run -it --rm --gpus all wamuir/golang-tf:gpu
 ```
 
 ## Background
