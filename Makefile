@@ -5,24 +5,23 @@ PYTHON = python3
 .DEFAULT_GOAL = assemble
 
 assemble:
-	${PYTHON} assembler/assembler.py \
+	${PYTHON} src/assembler.py \
 		--construct_dockerfiles \
 		--release=dockerfiles \
-		--spec_file=assembler/spec.yml \
-		--partial_dir=assembler/partials \
+		--spec_file=src/spec.yml \
+		--partial_dir=src/partials \
 		--dockerfile_dir=dockerfiles
-	(cd build && tar c tensorflow-*) | ( tar xf -)
 
 build: assemble
-	DOCKER_BUILDKIT=1 ${PYTHON} assembler/assembler.py \
-		--spec_file=assembler/spec.yml \
-		--partial_dir=assembler/partials \
+	DOCKER_BUILDKIT=1 ${PYTHON} src/assembler.py \
+		--spec_file=src/spec.yml \
+		--partial_dir=src/partials \
 		--dockerfile_dir=dockerfiles \
 		--build_images \
 		--hub_repository=wamuir/golang-tf \
 		--repository=wamuir/golang-tf \
 		--release=versioned \
-		--run_tests_path=$(realpath ./assembler/tests) \
+		--run_tests_path=$(realpath ./src/tests) \
 		--stop_on_failure
 
 buildx: assemble
