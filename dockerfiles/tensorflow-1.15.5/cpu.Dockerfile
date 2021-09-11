@@ -103,11 +103,11 @@ RUN apt-get update && apt-get -y install --no-install-recommends \
 RUN git clone --branch=${TF_GIT_TAG:-master} --depth=1 https://github.com/tensorflow/tensorflow.git .
 
 # fix template error (rewrite a conditional in a template to be syntactically valid)
-COPY patches/0001-genop-fix-template-error.patch .
+COPY src/patches/0001-genop-fix-template-error.patch .
 RUN git apply 0001-genop-fix-template-error.patch
 
 # add explicit go get for google.golang.org/protobuf/runtime/protoimpl
-COPY patches/0001-get-protoimpl.patch .
+COPY src/patches/0001-get-protoimpl.patch .
 RUN git apply 0001-get-protoimpl.patch
 
 
@@ -206,7 +206,7 @@ RUN --mount=from=tensorflow-build,dst=/mnt \
     && ldconfig
 
 # add bashrc
-COPY bashrc /etc/bash.bashrc
+COPY src/bashrc /etc/bash.bashrc
 
 
 
@@ -239,14 +239,14 @@ RUN cp ../tensorflow/ACKNOWLEDGMENTS ../tensorflow/LICENSE ../tensorflow/go.mod 
     && mkdir -p cc/saved_model/testdata && cd cc/saved_model/testdata && cp -r ${GOPATH}/src/github.com/tensorflow/tensorflow/tensorflow/cc/saved_model/testdata/half_plus_two .
 
 # create files for proxy
-WORKDIR ${GOPATH}/src/cache/github.com/tensorflow/tensorflow/@v
+WORKDIR ${GOPATH}/proxy/github.com/tensorflow/tensorflow/@v
 RUN echo "${TF_GO_VERS}" > list \
     && cp ${GOPATH}/src/github.com/tensorflow/tensorflow@${TF_GO_VERS}/go.mod ${TF_GO_VERS}.mod \
     && echo "{\"Version\": \"${TF_GO_VERS}\",\"Time\":\"$(date -u +'%Y-%m-%dT%H:%M:%SZ')\"}" > ${TF_GO_VERS}.info
 RUN apt-get update && apt-get -y install --no-install-recommends \
     zip
 RUN cd ${GOPATH}/src && zip -r -9 \
-    cache/github.com/tensorflow/tensorflow/@v/${TF_GO_VERS}.zip \
+    ../proxy/github.com/tensorflow/tensorflow/@v/${TF_GO_VERS}.zip \
     github.com/tensorflow/tensorflow@${TF_GO_VERS}
 
 # rename tf/go source for compat with legacy `go mod -replace` instructions
@@ -260,12 +260,13 @@ FROM golang-tf-base as golang-tf
 LABEL org.opencontainers.image.authors="William Muir <wamuir@gmail.com>"
 LABEL org.opencontainers.image.source="https://github.com/wamuir/golang-tf"
 
-# copy source
+# copy proxy and source
+COPY --from=golang-tf-build ${GOPATH}/proxy ${GOPATH}/proxy
 COPY --from=golang-tf-build ${GOPATH}/src ${GOPATH}/src
 
 # use fileproxy
 RUN go env -w \
-    GOPROXY="file://${GOPATH}/src/cache,$(go env GOPROXY)" \
+    GOPROXY="file://${GOPATH}/proxy,$(go env GOPROXY)" \
     GONOSUMDB="github.com/tensorflow/tensorflow"
 
 WORKDIR ${GOPATH}
