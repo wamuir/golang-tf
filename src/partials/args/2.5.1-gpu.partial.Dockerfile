@@ -13,5 +13,5 @@ ARG TF_CUDA_COMPUTE_CAPABILITIES=3.5,7.5,8.6
 ARG TF_CUDA_VERSION=11
 ARG TF_TENSORRT_VERSION=7
 
-# note: this libnvinfer uses cuda11.1 versions 
+# note: this libnvinfer uses cuda11.1 versions
 ARG LIBNVINFER_CUDA=11.1
