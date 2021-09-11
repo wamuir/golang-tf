@@ -19,7 +19,7 @@ group "default" {
 }
 
 target "build-cpu" {
-  dockerfile = "./tensorflow-${TF_VERSION}/cpu.Dockerfile"
+  dockerfile = "./dockerfiles/tensorflow-${TF_VERSION}/cpu.Dockerfile"
   platforms = [
     "linux/amd64",
     "linux/arm64"
@@ -36,7 +36,7 @@ target "build-cpu" {
 }
 
 target "build-gpu" {
-  dockerfile = "./tensorflow-${TF_VERSION}/gpu.Dockerfile"
+  dockerfile = "./dockerfiles/tensorflow-${TF_VERSION}/gpu.Dockerfile"
   platforms = [
     "linux/amd64"
   ]
