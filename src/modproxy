@@ -9,4 +9,4 @@ tar -x --directory docs
 
 LIST=docs/github.com/tensorflow/tensorflow/@v/list
 echo "v${TF_VERSION}+incompatible" >> ${LIST}
-sort -o ${LIST} ${LIST}
+sort -u -o ${LIST} ${LIST}
