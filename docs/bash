@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+#
+# Usage:  bash <(curl -s https://wamuir.github.io/golang-tf/bash)
+
+set -e
+
+GOEXECUTABLE=$(which go)
+if [[ ! -x "${GOEXECUTABLE}" ]]; then
+	echo "ERROR: go executable not found in PATH"
+	exit 1
+fi
+
+GOPROXY=$(go env GOPROXY)
+if ! echo "${GOPROXY}" | grep -Pq "^https://wamuir.github.io/golang-tf(?:,|$)"; then
+	GOPROXY="https://wamuir.github.io/golang-tf${GOPROXY:+,${GOPROXY}}"
+	${GOEXECUTABLE} env -w GOPROXY="${GOPROXY}"
+fi
+
+GONOSUMDB=$(go env GONOSUMDB)
+if ! echo "${GONOSUMDB}" | grep -Pq "github.com/tensorflow/tensorflow(?:,|$)"; then
+	GONOSUMDB="github.com/tensorflow/tensorflow${GONOSUMDB:+,${GONOSUMDB}}"
+	${GOEXECUTABLE} env -w GONOSUMDB="${GONOSUMDB}"
+fi
