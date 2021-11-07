@@ -50,18 +50,6 @@ slice_sets:
               - run.sh
 
     variants:
-        - add_to_name: "1.15.5"
-          dockerfile_exclusive_name: "tensorflow-1.15.5/cpu"
-          partials:
-              - args/1.15.5
-              - args/1.15.5-cpu
-              - protobuf-build
-              - bazel-build
-              - tensorflow-source
-              - patches/tensorflow-1.15.5
-              - tensorflow-build-base
-              - tensorflow-build
-              - golang-tf-base
         - add_to_name: "2.3.4"
           dockerfile_exclusive_name: "tensorflow-2.3.4/cpu"
           partials:
