@@ -1,7 +1,7 @@
 
 
 # GET TENSORFLOW SOURCE
-FROM debian:buster-slim AS tensorflow-source
+FROM debian:bullseye-slim AS tensorflow-source
 
 WORKDIR /tensorflow
 ARG TF_GIT_TAG

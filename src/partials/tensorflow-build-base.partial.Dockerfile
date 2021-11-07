@@ -1,7 +1,7 @@
 
 
 # SET UP BASE TENSORFLOW BUILD IMAGE FOR AMD64
-FROM debian:buster-slim AS tensorflow-build-base-amd64
+FROM debian:bullseye-slim AS tensorflow-build-base-amd64
 
 ARG BAZEL_OPTS_AMD64
 ARG CC_OPT_FLAGS_AMD64
@@ -29,7 +29,7 @@ RUN /build_devtoolset.sh devtoolset-7 /dt7 \
 
 
 # SET UP BASE TENSORFLOW BUILD IMAGE FOR ARM64
-FROM debian:buster-slim AS tensorflow-build-base-arm64
+FROM debian:bullseye-slim AS tensorflow-build-base-arm64
 
 ARG BAZEL_OPTS_ARM64
 ARG CC_OPT_FLAGS_AMD64

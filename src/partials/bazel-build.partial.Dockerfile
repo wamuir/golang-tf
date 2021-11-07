@@ -1,7 +1,7 @@
 
 
 # BUILD BAZEL
-FROM debian:buster-slim AS bazel-build
+FROM debian:bullseye-slim AS bazel-build
 
 WORKDIR /bazel
 ARG USE_BAZEL_VERS

@@ -1,7 +1,7 @@
 
 
 # BUILD PROTOBUF
-FROM debian:buster-slim AS protobuf-build
+FROM debian:bullseye-slim AS protobuf-build
 
 WORKDIR /protobuf
 ARG PROTOBUF_VERS
