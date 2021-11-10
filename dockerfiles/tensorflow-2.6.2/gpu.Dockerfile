@@ -29,7 +29,7 @@
 ARG GOLANG_VERS="1.17"
 ARG USE_BAZEL_VERS="3.7.2"
 ARG PROTOBUF_VERS="3.17.3"
-ARG TENSORFLOW_VERS="2.6.0"
+ARG TENSORFLOW_VERS="2.6.2"
 ARG TENSORFLOW_VERS_SUFFIX=""
 ARG TF_GIT_TAG=${TENSORFLOW_VERS:+v${TENSORFLOW_VERS}${TENSORFLOW_VERS_SUFFIX}}
 ARG TF_GO_VERS=${TENSORFLOW_VERS:+v${TENSORFLOW_VERS}+incompatible}
@@ -55,7 +55,7 @@ ARG LIBNVINFER_CUDA=11.1
 
 
 # BUILD PROTOBUF
-FROM debian:buster-slim AS protobuf-build
+FROM debian:bullseye-slim AS protobuf-build
 
 WORKDIR /protobuf
 ARG PROTOBUF_VERS
@@ -78,7 +78,7 @@ RUN git clone --branch=v${PROTOBUF_VERS} --depth=1 --recurse-submodules https://
 
 
 # BUILD BAZEL
-FROM debian:buster-slim AS bazel-build
+FROM debian:bullseye-slim AS bazel-build
 
 WORKDIR /bazel
 ARG USE_BAZEL_VERS
@@ -105,7 +105,7 @@ RUN python3 -m venv /venv \
 
 
 # GET TENSORFLOW SOURCE
-FROM debian:buster-slim AS tensorflow-source
+FROM debian:bullseye-slim AS tensorflow-source
 
 WORKDIR /tensorflow
 ARG TF_GIT_TAG
@@ -121,7 +121,7 @@ RUN git apply 0001-simplify-generation-of-go-protos.patch
 
 
 # SET UP BASE TENSORFLOW BUILD IMAGE FOR AMD64
-FROM debian:buster-slim AS tensorflow-build-base-amd64
+FROM debian:bullseye-slim AS tensorflow-build-base-amd64
 
 ARG BAZEL_OPTS_AMD64
 ARG CC_OPT_FLAGS_AMD64
@@ -149,7 +149,7 @@ RUN /build_devtoolset.sh devtoolset-7 /dt7 \
 
 
 # SET UP BASE TENSORFLOW BUILD IMAGE FOR ARM64
-FROM debian:buster-slim AS tensorflow-build-base-arm64
+FROM debian:bullseye-slim AS tensorflow-build-base-arm64
 
 ARG BAZEL_OPTS_ARM64
 ARG CC_OPT_FLAGS_AMD64
@@ -252,7 +252,7 @@ RUN python3 -m venv /venv \
 
 
 # SET UP BASE GOLANG IMAGE
-FROM golang:${GOLANG_VERS}-buster AS golang-tf-base
+FROM golang:${GOLANG_VERS}-bullseye AS golang-tf-base
 ARG TENSORFLOW_VERS
 ARG TENSORFLOW_VERS_SUFFIX
 ARG TF_GO_VERS
