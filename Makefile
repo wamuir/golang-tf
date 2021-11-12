@@ -2,7 +2,7 @@
 .DEFAULT_GOAL = assemble
 
 PYTHON = python3
-TF_VERSION := 2.6.0
+TF_VERSION := 2.7.0
 GPU := true
 LATEST := true
 
@@ -27,7 +27,7 @@ build: assemble
 		--stop_on_failure
 
 buildx: assemble
-	TF_VERSION=$(TF_VERSION) GPU=$(GPU) LATEST=$(LATEST) docker buildx bake --pull --load
+	TF_VERSION=$(TF_VERSION) GPU=$(GPU) LATEST=$(LATEST) docker buildx bake
 
 proxy:
 	src/modproxy $(TF_VERSION)

@@ -1,0 +1,173 @@
+diff --git a/tensorflow/core/protobuf/status.proto b/tensorflow/core/protobuf/status.proto
+index e0a9e95a7c9..634a36f4102 100644
+--- a/tensorflow/core/protobuf/status.proto
++++ b/tensorflow/core/protobuf/status.proto
+@@ -2,6 +2,8 @@ syntax = "proto3";
+ 
+ package tensorflow;
+ 
++option go_package = "github.com/tensorflow/tensorflow/tensorflow/go/core/protobuf/for_core_protos_go_proto";
++
+ // If included as a payload, this message flags the Status to be a "derived"
+ // Status. Used by StatusGroup to ignore certain Statuses when reporting
+ // errors to end users.
+diff --git a/tensorflow/go/genop/generate.sh b/tensorflow/go/genop/generate.sh
+index 3a928f8e109..847020996fc 100644
+--- a/tensorflow/go/genop/generate.sh
++++ b/tensorflow/go/genop/generate.sh
+@@ -16,7 +16,8 @@
+ 
+ set -e
+ 
+-go get google.golang.org/protobuf/cmd/protoc-gen-go
++go get -d google.golang.org/protobuf/proto
++go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+ 
+ if [ -z "${GOPATH}" ]
+ then
+@@ -65,12 +66,11 @@ fi
+ # Ensure that protoc-gen-go is available in $PATH
+ # Since ${PROTOC} will require it.
+ export PATH=$PATH:${GOPATH}/bin
+-mkdir -p ../vendor
+ for FILE in ${TF_DIR}/tensorflow/core/framework/*.proto \
+     ${TF_DIR}/tensorflow/core/protobuf/*.proto \
+     ${TF_DIR}/tensorflow/stream_executor/*.proto; do
+   ${PROTOC} \
+     -I ${TF_DIR} \
+-    --go_out=../vendor \
++    --go_out=${GOPATH}/src \
+     $FILE
+ done
+diff --git a/tensorflow/go/tensor.go b/tensorflow/go/tensor.go
+index 20e3acca03b..6d609d6b2f0 100644
+--- a/tensorflow/go/tensor.go
++++ b/tensorflow/go/tensor.go
+@@ -98,9 +98,7 @@ func NewTensor(value interface{}) (*Tensor, error) {
+ 
+ 	raw := tensorData(t.c)
+ 
+-	defer runtime.SetFinalizer(t, func(t *Tensor) {
+-		t.finalize()
+-	})
++	runtime.SetFinalizer(t, (*Tensor).finalize)
+ 
+ 	buf := bytes.NewBuffer(raw[:0:len(raw)])
+ 
+@@ -115,10 +113,7 @@ func NewTensor(value interface{}) (*Tensor, error) {
+ 		// not be contiguous with the others or in the order we might
+ 		// expect, so we need to work our way down to each slice of
+ 		// primitives and copy them individually
+-		if n, err := encodeTensorWithSlices(buf, val, shape); err != nil {
+-			// Set nbytes to count of bytes written for deferred call to
+-			// runtime.SetFinalizer
+-			nbytes = uintptr(n)
++		if _, err := encodeTensorWithSlices(buf, val, shape); err != nil {
+ 			return nil, err
+ 		}
+ 	}
+@@ -422,11 +417,17 @@ func shapeAndDataTypeOf(val reflect.Value) (shape []int64, dt DataType, err erro
+ 	typ := val.Type()
+ 	for typ.Kind() == reflect.Array || typ.Kind() == reflect.Slice {
+ 		shape = append(shape, int64(val.Len()))
++		// If slice elements are slices, verify that all of them have the same size.
++		// Go's type system makes that guarantee for arrays.
+ 		if val.Len() > 0 {
+-			// In order to check tensor structure properly in general case we need to iterate over all slices of the tensor to check sizes match
+-			// Since we already going to iterate over all elements in encodeTensor() let's
+-			// 1) do the actual check in encodeTensor() to save some cpu cycles here
+-			// 2) assume the shape is represented by lengths of elements with zero index in each dimension
++			if val.Type().Elem().Kind() == reflect.Slice {
++				expected := val.Index(0).Len()
++				for i := 1; i < val.Len(); i++ {
++					if val.Index(i).Len() != expected {
++						return shape, dt, fmt.Errorf("mismatched slice lengths: %d and %d", val.Index(i).Len(), expected)
++					}
++				}
++			}
+ 			val = val.Index(0)
+ 		}
+ 		typ = typ.Elem()
+diff --git a/tensorflow/go/tensor_test.go b/tensorflow/go/tensor_test.go
+index 8aa710669a0..09f6d7dbdae 100644
+--- a/tensorflow/go/tensor_test.go
++++ b/tensorflow/go/tensor_test.go
+@@ -21,6 +21,7 @@ import (
+ 	"fmt"
+ 	"io"
+ 	"reflect"
++	"runtime"
+ 	"testing"
+ )
+ 
+@@ -77,14 +78,6 @@ func TestNewTensor(t *testing.T) {
+ 		// native ints not supported
+ 		int(5),
+ 		[]int{5},
+-		// Mismatched dimensions
+-		[][]float32{{1, 2, 3}, {4}},
+-		// Mismatched dimensions. Should return "mismatched slice lengths" error instead of "BUG"
+-		[][][]float32{{{1, 2}, {3, 4}}, {{1}, {3}}},
+-		// Mismatched dimensions. Should return error instead of valid tensor
+-		[][][]float32{{{1, 2}, {3, 4}}, {{1}, {3}}, {{1, 2, 3}, {2, 3, 4}}},
+-		// Mismatched dimensions for strings
+-		[][]string{{"abc"}, {"abcd", "abcd"}},
+ 	}
+ 
+ 	for _, test := range tests {
+@@ -100,9 +93,8 @@ func TestNewTensor(t *testing.T) {
+ 		// Test that encode and decode gives the same value. We skip arrays because
+ 		// they're returned as slices.
+ 		if reflect.TypeOf(test.value).Kind() != reflect.Array {
+-			got := tensor.Value()
+-			if !reflect.DeepEqual(test.value, got) {
+-				t.Errorf("encode/decode: got %v, want %v", got, test.value)
++			if !reflect.DeepEqual(test.value, tensor.Value()) {
++				t.Errorf("encode/decode: got %v, want %v", tensor.Value(), test.value)
+ 			}
+ 		}
+ 	}
+@@ -118,6 +110,43 @@ func TestNewTensor(t *testing.T) {
+ 	}
+ }
+ 
++func TestNewTensorValidateDimensions(t *testing.T) {
++        var errorTests = []interface{}{
++                // Mismatched dimensions
++                [][]float32{{1, 2, 3}, {4}},
++                // Mismatched dimensions. Should return "mismatched slice lengths" error instead of "BUG"
++                [][][]float32{{{1, 2}, {3, 4}}, {{1}, {3}}},
++                // Mismatched dimensions. Should return error instead of valid tensor
++                [][][]float32{{{1, 2}, {3, 4}}, {{1}, {3}}, {{1, 2, 3}, {2, 3, 4}}},
++                // Mismatched dimensions for strings
++                [][]string{{"abc"}, {"abcd", "abcd"}},
++        }
++
++        // Test that an error is returned in response to mismatched dimensions
++        // and that no tensor is returned.  Dimensions should be checked and a
++        // mismatch caught in NewTensor prior to actually allocating a new
++        // tensor in cgo. Given how string tensors are encoded and how tensors
++        // are freed, a mismatch caught partway through encoding a string
++        // tensor may result in a segfault, once the finalizer is called. A
++        // single run of this test is not reliable at producing a segfault,
++        // hence iteration. See github.com/tensorflow/tensorflow/pull/52257
++        // for some detail on the issue.
++        for i := 0; i < 1e5; i++ {
++                for _, test := range errorTests {
++                        tensor, err := NewTensor(test)
++                        if err == nil {
++                                t.Errorf("NewTensor(%v): %v", test, err)
++                        }
++                        if tensor != nil {
++                                t.Errorf("NewTensor(%v) = %v, want nil", test, tensor)
++                        }
++                }
++        }
++
++        // Execute any finalizers (blocking).
++        runtime.GC()
++}
++
+ func TestTensorSerialization(t *testing.T) {
+ 	var tests = []interface{}{
+ 		bool(true),
