@@ -1,0 +1,100 @@
+#!/usr/bin/env bash
+###############################################################################
+# Proxy installation for Go bindings to TensorFlow.  This script updates Go
+# environment variables for the current user (via user's Go `env`file) to
+# obtain a generated version of the Go bindings from GitHub Pages.
+#
+# This script is intended for installation via:
+#   $ bash <(curl -s https://wamuir.github.io/golang-tf/install)
+#
+# See https://github.com/wamuir/golang-tf for additional information.
+#
+###############################################################################
+
+set -eo pipefail
+
+command_exists() {
+  command -v "$@" > /dev/null 2>&1
+}
+
+prepend() {
+  local __esc
+  local __var
+  __esc="$(echo "${2}" | sed -e 's/[]\/$*.^[]/\\&/g')"
+  __var="$(echo "${1}" | sed -e "s/${__esc}[,]\?//g")"
+  echo "${2}${__var:+,${__var}}"
+}
+
+main() {
+  if ! command_exists go; then
+    echo "Unable to find 'go' executable in PATH" >&2
+    exit 1
+  fi
+
+  local GOPROXY
+  local GONOSUMDB
+  local __old_goenv
+  local __new_goenv
+
+  GOPROXY="$(prepend "$(go env GOPROXY)" "https://wamuir.github.io/golang-tf")"
+  GONOSUMDB="$(prepend "$(go env GONOSUMDB)" "github.com/tensorflow/tensorflow")"
+
+  __old_goenv=$( \
+    go env \
+    | sed -e 's/^GOGCCFLAGS.*$//g' -e '/^$/d' \
+    | sort \
+  )
+  __new_goenv=$( \
+    GOPROXY=${GOPROXY} \
+    GONOSUMDB=${GONOSUMDB} \
+    go env \
+    | sed -e 's/^GOGCCFLAGS.*$//g' -e '/^$/d' \
+    | sort \
+  )
+
+  if [[ "${__old_goenv}" != "${__new_goenv}" ]]; then
+    if [[ -t 1 ]]; then
+
+      cat <<END
+${0##*/}
+  The following changes will be applied to the default Go environment variable
+  settings for the current user:
+  -----------------------------------------------------------------------------
+  # GOPROXY=${GOPROXY}
+  # GONOSUMDB=${GONOSUMDB}
+
+END
+
+      fold -w 78 -s <(echo \
+        "These settings will be written to $(go env GOENV) with a backup" \
+        "copy of unmodified settings stored at $(go env GOENV).bak; changes" \
+	"will only affect the current user (${USER})." \
+      ) | awk '{ print "  " $0 }'
+
+      echo
+      read -n 1 -r -p "Do you wish to proceed [Y/n] " REPLY
+      echo
+      case "${REPLY:-Y}" in
+        [Yy] ) ;;
+           * ) exit 1 ;;
+        esac
+    fi
+
+    if [[ -f "$(go env GOENV)" ]]; then
+      cp -a "$(go env GOENV)" "$(go env GOENV).bak"
+    else
+      touch "$(go env GOENV).bak"
+    fi
+
+    go env -w GOPROXY="${GOPROXY}" GONOSUMDB="${GONOSUMDB}"
+  else
+      cat <<END
+${0##*/}
+  No changes are needed to the default Go environment variable settings for the
+  current user.
+
+END
+  fi
+}
+
+main
