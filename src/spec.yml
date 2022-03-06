@@ -76,27 +76,27 @@ slice_sets:
               - tensorflow-build
               - golang-tf-base
               - golang-tf-base-cuda
-        - add_to_name: "2.6.2"
-          dockerfile_exclusive_name: "tensorflow-2.6.2/cpu"
+        - add_to_name: "2.6.3"
+          dockerfile_exclusive_name: "tensorflow-2.6.3/cpu"
           partials:
-              - args/2.6.2
-              - args/2.6.2-cpu
+              - args/2.6.3
+              - args/2.6.3-cpu
               - protobuf-build
               - bazel-build
               - tensorflow-source
-              - patches/tensorflow-2.6.2
+              - patches/tensorflow-2.6.3
               - tensorflow-build-base
               - tensorflow-build
               - golang-tf-base
-        - add_to_name: "2.6.2-gpu"
-          dockerfile_exclusive_name: "tensorflow-2.6.2/gpu"
+        - add_to_name: "2.6.3-gpu"
+          dockerfile_exclusive_name: "tensorflow-2.6.3/gpu"
           partials:
-              - args/2.6.2
-              - args/2.6.2-gpu
+              - args/2.6.3
+              - args/2.6.3-gpu
               - protobuf-build
               - bazel-build
               - tensorflow-source
-              - patches/tensorflow-2.6.2
+              - patches/tensorflow-2.6.3
               - tensorflow-build-base
               - tensorflow-build-base-cuda
               - tensorflow-build
