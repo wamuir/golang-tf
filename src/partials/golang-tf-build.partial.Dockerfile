@@ -24,7 +24,7 @@ RUN cd ${GOPATH}/src/github.com/tensorflow/tensorflow/tensorflow/go \
 
 # copy tensorflow source, selectively
 WORKDIR ${GOPATH}/src/github.com/tensorflow/tensorflow@${TF_GO_VERS}
-RUN cp ../tensorflow/ACKNOWLEDGMENTS ../tensorflow/LICENSE ../tensorflow/go.mod ../tensorflow/go.sum . \
+RUN cp ../tensorflow/LICENSE ../tensorflow/go.mod ../tensorflow/go.sum . \
     && mkdir -p tensorflow && cd tensorflow && cp -r ${GOPATH}/src/github.com/tensorflow/tensorflow/tensorflow/go . \
     && mkdir -p cc/saved_model/testdata && cd cc/saved_model/testdata && cp -r ${GOPATH}/src/github.com/tensorflow/tensorflow/tensorflow/cc/saved_model/testdata/half_plus_two .
 
