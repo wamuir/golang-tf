@@ -1,0 +1,25 @@
+From 65a5434389d4c1754275fb4c55c0c6f984c25e1d Mon Sep 17 00:00:00 2001
+From: William Muir <wamuir@gmail.com>
+Date: Wed, 17 Nov 2021 06:43:22 -0600
+Subject: [PATCH] Declare Go import path in coordination service proto
+
+---
+ tensorflow/core/protobuf/coordination_service.proto | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/tensorflow/core/protobuf/coordination_service.proto b/tensorflow/core/protobuf/coordination_service.proto
+index d32c1e93780..1831f4bda2e 100644
+--- a/tensorflow/core/protobuf/coordination_service.proto
++++ b/tensorflow/core/protobuf/coordination_service.proto
+@@ -4,6 +4,8 @@ package tensorflow;
+ 
+ import "tensorflow/core/framework/device_attributes.proto";
+ 
++option go_package = "github.com/tensorflow/tensorflow/tensorflow/go/core/protobuf/for_core_protos_go_proto";
++
+ // Request and response messages for registering a worker to the cluster leader.
+ // Use `job` and `task` to represent the role of the worker, and use
+ // `incarnation` to uniquely identify a worker process. Leader responds with its
+-- 
+2.35.1
+
