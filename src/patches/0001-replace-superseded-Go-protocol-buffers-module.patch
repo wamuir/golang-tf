@@ -1,0 +1,126 @@
+From 9f91a3d7d9a3916024448005ae9f19ebab77f81f Mon Sep 17 00:00:00 2001
+From: wamuir <17497234+wamuir@users.noreply.github.com>
+Date: Wed, 16 Jun 2021 18:53:04 -0500
+Subject: [PATCH] replace superseded Go protocol buffers module
+
+---
+ tensorflow/go/genop/generate.sh             | 3 +--
+ tensorflow/go/genop/internal/api_def_map.go | 2 +-
+ tensorflow/go/genop/internal/genop.go       | 6 ++++--
+ tensorflow/go/genop/internal/genop_test.go  | 8 ++++----
+ tensorflow/go/saved_model.go                | 2 +-
+ 5 files changed, 11 insertions(+), 10 deletions(-)
+
+diff --git a/tensorflow/go/genop/generate.sh b/tensorflow/go/genop/generate.sh
+index 4aee23f4d22..527a65ff965 100644
+--- a/tensorflow/go/genop/generate.sh
++++ b/tensorflow/go/genop/generate.sh
+@@ -16,8 +16,7 @@
+ 
+ set -e
+ 
+-go get github.com/golang/protobuf/proto
+-go get github.com/golang/protobuf/protoc-gen-go
++go get google.golang.org/protobuf/cmd/protoc-gen-go
+ 
+ if [ -z "${GOPATH}" ]
+ then
+diff --git a/tensorflow/go/genop/internal/api_def_map.go b/tensorflow/go/genop/internal/api_def_map.go
+index 7fa21f8a33e..9113a84015e 100644
+--- a/tensorflow/go/genop/internal/api_def_map.go
++++ b/tensorflow/go/genop/internal/api_def_map.go
+@@ -30,9 +30,9 @@ import (
+ 	"runtime"
+ 	"unsafe"
+ 
+-	"github.com/golang/protobuf/proto"
+ 	adpb "github.com/tensorflow/tensorflow/tensorflow/go/core/framework/api_def_go_proto"
+ 	odpb "github.com/tensorflow/tensorflow/tensorflow/go/core/framework/op_def_go_proto"
++	"google.golang.org/protobuf/proto"
+ )
+ 
+ // Encapsulates a collection of API definitions.
+diff --git a/tensorflow/go/genop/internal/genop.go b/tensorflow/go/genop/internal/genop.go
+index fcc7c2b4b22..7920882aef3 100644
+--- a/tensorflow/go/genop/internal/genop.go
++++ b/tensorflow/go/genop/internal/genop.go
+@@ -46,9 +46,10 @@ import (
+ 	"text/template"
+ 	"unsafe"
+ 
+-	"github.com/golang/protobuf/proto"
+ 	adpb "github.com/tensorflow/tensorflow/tensorflow/go/core/framework/api_def_go_proto"
+ 	odpb "github.com/tensorflow/tensorflow/tensorflow/go/core/framework/op_def_go_proto"
++	"google.golang.org/protobuf/encoding/prototext"
++	"google.golang.org/protobuf/proto"
+ )
+ 
+ // GenerateFunctionsForRegisteredOps writes a Go source code file to w
+@@ -573,7 +574,8 @@ func isListAttr(attrdef *odpb.OpDef_AttrDef) bool {
+ // proto.CompactTextString) will print "b:true", or "i:7" etc. This function
+ // strips out the leading "b:" or "i:".
+ func stripLeadingColon(m proto.Message) string {
+-	x := proto.CompactTextString(m)
++	o := prototext.MarshalOptions{Multiline: false}
++	x := o.Format(m)
+ 	y := strings.SplitN(x, ":", 2)
+ 	if len(y) < 2 {
+ 		return x
+diff --git a/tensorflow/go/genop/internal/genop_test.go b/tensorflow/go/genop/internal/genop_test.go
+index b467efc7aea..e81efea7b21 100644
+--- a/tensorflow/go/genop/internal/genop_test.go
++++ b/tensorflow/go/genop/internal/genop_test.go
+@@ -21,9 +21,9 @@ import (
+ 	"go/format"
+ 	"testing"
+ 
+-	"github.com/golang/protobuf/proto"
+ 	adpb "github.com/tensorflow/tensorflow/tensorflow/go/core/framework/api_def_go_proto"
+ 	odpb "github.com/tensorflow/tensorflow/tensorflow/go/core/framework/op_def_go_proto"
++	"google.golang.org/protobuf/encoding/prototext"
+ )
+ 
+ // Creates an ApiDef based on opdef and applies overrides
+@@ -721,7 +721,7 @@ func SampleDistortedBoundingBoxMinObjectCovered(value float32) SampleDistortedBo
+ // SampleDistortedBoundingBoxAspectRatioRange sets the optional aspect_ratio_range attribute to value.
+ //
+ // value: Blah blah
+-// If not specified, defaults to <f:0.75 f:1.33 >
++// If not specified, defaults to {f:0.75  f:1.33}
+ func SampleDistortedBoundingBoxAspectRatioRange(value []float32) SampleDistortedBoundingBoxAttr {
+ 	return func(m optionalAttr) {
+ 		m["aspect_ratio_range"] = value
+@@ -731,7 +731,7 @@ func SampleDistortedBoundingBoxAspectRatioRange(value []float32) SampleDistorted
+ // SampleDistortedBoundingBoxAreaRange sets the optional area_range attribute to value.
+ //
+ // value: Blah blah
+-// If not specified, defaults to <f:0.05 f:1 >
++// If not specified, defaults to {f:0.05  f:1}
+ func SampleDistortedBoundingBoxAreaRange(value []float32) SampleDistortedBoundingBoxAttr {
+ 	return func(m optionalAttr) {
+ 		m["area_range"] = value
+@@ -797,7 +797,7 @@ func SampleDistortedBoundingBox(scope *Scope, image_size tf.Output, bounding_box
+ 			var opdef odpb.OpDef
+ 			var apidef *adpb.ApiDef
+ 			var buf bytes.Buffer
+-			if err := proto.UnmarshalText(test.opdef, &opdef); err != nil {
++			if err := prototext.Unmarshal([]byte(test.opdef), &opdef); err != nil {
+ 				t.Fatal(err)
+ 			}
+ 			apidef = GetAPIDef(t, &opdef, test.apidef)
+diff --git a/tensorflow/go/saved_model.go b/tensorflow/go/saved_model.go
+index 64ae82e3b01..b37605d37c0 100644
+--- a/tensorflow/go/saved_model.go
++++ b/tensorflow/go/saved_model.go
+@@ -21,7 +21,7 @@ import (
+ 	"runtime"
+ 	"unsafe"
+ 
+-	"github.com/golang/protobuf/proto"
++	"google.golang.org/protobuf/proto"
+ 	corepb "github.com/tensorflow/tensorflow/tensorflow/go/core/protobuf/for_core_protos_go_proto"
+ )
+ 
+-- 
+2.34.1
+

@@ -26,10 +26,10 @@
 # This file was assembled from multiple pieces, whose use is documented
 # throughout. Refer to github.com/wamuir/golang-tf for further information.
 
-ARG GOLANG_VERS="1.17"
+ARG GOLANG_VERS="1.19"
 ARG USE_BAZEL_VERS="3.7.2"
 ARG PROTOBUF_VERS="3.17.3"
-ARG TENSORFLOW_VERS="2.6.3"
+ARG TENSORFLOW_VERS="2.6.5"
 ARG TENSORFLOW_VERS_SUFFIX=""
 ARG TF_GIT_TAG=${TENSORFLOW_VERS:+v${TENSORFLOW_VERS}${TENSORFLOW_VERS_SUFFIX}}
 ARG TF_GO_VERS=${TENSORFLOW_VERS:+v${TENSORFLOW_VERS}+incompatible}
@@ -114,9 +114,21 @@ RUN apt-get update && apt-get -y install --no-install-recommends \
     git
 RUN git clone --branch=${TF_GIT_TAG:-master} --depth=1 https://github.com/tensorflow/tensorflow.git .
 
+# replace deprecated github.com/golang/protobuf with google.golang.org/protobuf
+COPY src/patches/0001-replace-superseded-Go-protocol-buffers-module.patch .
+RUN git apply 0001-replace-superseded-Go-protocol-buffers-module.patch
+
+# disable flaky test
+COPY src/patches/0001-disable-TestGenerateOp.patch .
+RUN git apply 0001-disable-TestGenerateOp.patch
+
 # apply patch to write generated source code to tensorflow source / don't vendor (#48872)
 COPY src/patches/0001-simplify-generation-of-go-protos.patch .
 RUN git apply 0001-simplify-generation-of-go-protos.patch
+
+# use `go install` to install go executables 
+COPY src/patches/0001-Go-Update-go-get-and-go-install-cmds-for-Go-1.17-com.patch .
+RUN git apply 0001-Go-Update-go-get-and-go-install-cmds-for-Go-1.17-com.patch
 
 
 
@@ -192,9 +204,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
     gnupg2
-RUN curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/7fa2af80.pub | apt-key add - \
+RUN apt-key adv --fetch-keys http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/3bf863cc.pub \
+    && apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1804/x86_64/7fa2af80.pub \
     && echo "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64 /" > /etc/apt/sources.list.d/cuda.list \
     && echo "deb https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1804/x86_64 /" > /etc/apt/sources.list.d/nvidia-ml.list
+
 
 # install cuda build dependencies
 # note: bash needed for string substitution
@@ -273,7 +287,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
     gnupg2
-RUN curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/7fa2af80.pub | apt-key add - \
+RUN apt-key adv --fetch-keys http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/3bf863cc.pub \
+    && apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1804/x86_64/7fa2af80.pub \
     && echo "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64 /" > /etc/apt/sources.list.d/cuda.list \
     && echo "deb https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1804/x86_64 /" > /etc/apt/sources.list.d/nvidia-ml.list
 
@@ -332,7 +347,7 @@ RUN cd ${GOPATH}/src/github.com/tensorflow/tensorflow/tensorflow/go \
 
 # copy tensorflow source, selectively
 WORKDIR ${GOPATH}/src/github.com/tensorflow/tensorflow@${TF_GO_VERS}
-RUN cp ../tensorflow/ACKNOWLEDGMENTS ../tensorflow/LICENSE ../tensorflow/go.mod ../tensorflow/go.sum . \
+RUN cp ../tensorflow/LICENSE ../tensorflow/go.mod ../tensorflow/go.sum . \
     && mkdir -p tensorflow && cd tensorflow && cp -r ${GOPATH}/src/github.com/tensorflow/tensorflow/tensorflow/go . \
     && mkdir -p cc/saved_model/testdata && cd cc/saved_model/testdata && cp -r ${GOPATH}/src/github.com/tensorflow/tensorflow/tensorflow/cc/saved_model/testdata/half_plus_two .
 

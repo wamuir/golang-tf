@@ -1,0 +1,26 @@
+From 74bf9d1651bd2ea2f04ef686697dfa3c8a854bd2 Mon Sep 17 00:00:00 2001
+From: William Muir <wamuir@gmail.com>
+Date: Sun, 3 Oct 2021 23:22:32 -0500
+Subject: [PATCH] [Go] Update go get and go install cmds for Go 1.17 compat
+
+---
+ tensorflow/go/genop/generate.sh | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/tensorflow/go/genop/generate.sh b/tensorflow/go/genop/generate.sh
+index 3a928f8e109..5312ee05ae5 100644
+--- a/tensorflow/go/genop/generate.sh
++++ b/tensorflow/go/genop/generate.sh
+@@ -16,7 +16,8 @@
+ 
+ set -e
+ 
+-go get google.golang.org/protobuf/cmd/protoc-gen-go
++go get -d google.golang.org/protobuf/proto
++go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+ 
+ if [ -z "${GOPATH}" ]
+ then
+-- 
+2.34.1
+

@@ -1,25 +1,17 @@
-From 75f23e03735a7696404731179423415d68a31d80 Mon Sep 17 00:00:00 2001
+From 41bfbe8ad835cbd5333f03a6492d8711a8105217 Mon Sep 17 00:00:00 2001
 From: wamuir <17497234+wamuir@users.noreply.github.com>
 Date: Sun, 2 May 2021 09:58:10 -0500
 Subject: [PATCH] simplify generation of go protos
 
 ---
- tensorflow/go/genop/generate.sh | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ tensorflow/go/genop/generate.sh | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
 diff --git a/tensorflow/go/genop/generate.sh b/tensorflow/go/genop/generate.sh
-index 4aee23f4d22..743a9b56d29 100644
+index 4aee23f4d22..7b183244fb3 100644
 --- a/tensorflow/go/genop/generate.sh
 +++ b/tensorflow/go/genop/generate.sh
-@@ -18,6 +18,7 @@ set -e
- 
- go get github.com/golang/protobuf/proto
- go get github.com/golang/protobuf/protoc-gen-go
-+go get google.golang.org/protobuf/runtime/protoimpl
- 
- if [ -z "${GOPATH}" ]
- then
-@@ -61,12 +62,11 @@ fi
+@@ -61,12 +61,11 @@ fi
  # Ensure that protoc-gen-go is available in $PATH
  # Since ${PROTOC} will require it.
  export PATH=$PATH:${GOPATH}/bin
@@ -34,5 +26,5 @@ index 4aee23f4d22..743a9b56d29 100644
      $FILE
  done
 -- 
-2.31.1
+2.34.1
 
