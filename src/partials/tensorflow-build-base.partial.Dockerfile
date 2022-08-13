@@ -5,6 +5,7 @@ FROM debian:bullseye-slim AS tensorflow-build-base-amd64
 
 ARG BAZEL_OPTS_AMD64
 ARG CC_OPT_FLAGS_AMD64
+ARG DEVTOOLSET
 ENV BAZEL_OPTS=${BAZEL_OPTS_AMD64}
 ENV CC_OPT_FLAGS=${CC_OPT_FLAGS_AMD64}
 
@@ -23,8 +24,7 @@ RUN apt-get update && apt-get -y install --no-install-recommends \
     rpm2cpio \
     unar \
     wget
-RUN /build_devtoolset.sh devtoolset-7 /dt7 \
-    && /build_devtoolset.sh devtoolset-8 /dt8
+RUN echo -n ${DEVTOOLSET} | xargs -I {} -d "," /build_devtoolset.sh devtoolset-{} /dt{}
 
 
 
