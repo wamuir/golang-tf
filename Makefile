@@ -2,7 +2,7 @@
 .DEFAULT_GOAL = assemble
 
 PYTHON = python3
-TF_VERSION := 2.8.0
+TF_VERSION := 2.9.1
 GPU := true
 LATEST := true
 
